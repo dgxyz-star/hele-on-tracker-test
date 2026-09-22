@@ -275,8 +275,8 @@
         /* Clean Connection / Layover Summary Bar */
         .transfer-summary-bar {
             background: #1e293b;
-            border: 1px solid #0284c7;
-            border-left: 4px solid #38bdf8;
+            border: 1px solid #ca8a04;
+            border-left: 4px solid #eab308;
             border-radius: 6px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.5);
             padding: 6px 10px;
@@ -299,7 +299,7 @@
         .transfer-title {
             font-size: 0.7rem;
             font-weight: bold;
-            color: #38bdf8;
+            color: #eab308;
             display: flex;
             align-items: center;
             gap: 5px;
@@ -347,7 +347,9 @@
 
         .popup-times-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; margin-bottom: 2px; font-weight: bold; white-space: nowrap; }
         .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; min-width: max-content; }
-        .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; align-items: center; min-width: max-content; }
+        .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; align-items: center; min-width: max-content; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+        .popup-departure-card:hover { background: #1e293b; border-color: #475569; }
+        .popup-departure-card.active-selected-trip { background: rgba(6, 182, 212, 0.12); border-color: #06b6d4; }
         .popup-dep-main-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; white-space: nowrap; }
         .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
         .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; }
@@ -444,7 +446,7 @@
                 <h3>Map Zooming & Gestures</h3>
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
                 <p><strong>📍 Long-Press Map Location:</strong> Long-press anywhere on the map to automatically find and display the closest route and its nearby stops relative to that location.</p>
-                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Transfer/Overlap stop). Tapping a stop marker on the map opens departures and cycles through all routes serving that stop. Tap 📋 to view full trip itineraries or ◀ to return.</p>
+                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Transfer/Overlap stop). Tapping a stop marker on the map opens departures and cycles through all routes serving that stop. Tap 📋 in the top header to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to the origin stop if inspecting remote itinerary stops.</p>
             </div>
             <div class="help-section">
                 <h3>Top Control Bar & Floating Menu</h3>
@@ -462,7 +464,7 @@
                 <p>When you select a route from the top dropdown, it displays cleanly on the map without cluttering your screen with extra panels.</p>
                 <ul>
                     <li><strong>Setting Start/End Stops:</strong> Tap any bus stop marker on the map and click the 📍 (Start) or 🏁 (End) buttons. Doing so automatically opens that route's bottom trip planner card.</li>
-                    <li><strong>🔀 Automatic Transfer / Layover Summary Bar:</strong> When you set up multiple sequential routes that connect at a common transfer stop, a compact summary bar is automatically inserted directly between the route cards. It displays the shared transfer stop name, Route 1 arrival time, Route 2 departure time, and calculated layover/wait duration. You can browse through connection pairs with the ◀ ▶ buttons or tap specific trips.</li>
+                    <li><strong>🔀 Automatic Transfer / Layover Summary Bar:</strong> When you set up multiple sequential routes that connect at a common transfer stop, a compact yellow summary bar is automatically inserted directly between the route cards. It displays the shared transfer stop name, Route 1 arrival time, Route 2 departure time, and calculated layover/wait duration. You can browse through connection pairs with the ◀ ▶ buttons or tap specific trips.</li>
                     <li><strong>🔍 Find Sequential Closest Routes:</strong> Tap the magnifying glass icon inside any stop marker's popup to display routes serving that stop. When you press it multiple times, it will initially display the next closest route to that stop and then sequential closest routes.</li>
                     <li><strong>Dual Selection Methods:</strong> Once a route card is open, you can either continue using the map popups or use the dropdown selectors inside the card to fine-tune your start and end stops.</li>
                     <li><strong>Dynamic Equal-Share Space & Scrolling:</strong> Multiple active route cards automatically resize to share available vertical screen space equally. Each card is independently scrollable so you can easily thumb through all matching scheduled trips.</li>
@@ -650,6 +652,8 @@
         let gtfsData = { routes: {}, rawRoutes: {}, trips: {}, stops: {}, stopTimes: {}, shapes: {}, calendar: {}, calendarDates: {} };
         let routePlanners = {}; // routeId -> { startStopId, endStopId, isCollapsed, selectedTripId }
         let stopActiveRouteIndex = {}; // stopId -> active index in routes serving that stop
+        let stopSelectedTripId = {}; // stopId -> tripId
+        let inspectedOriginStop = null; // { stopId, lat, lng }
         let availableRouteOptionsHtml = '<option value="">Select Route</option>';
 
         const vibrantRouteColors = ['#f43f5e', '#38bdf8', '#4ade80', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#84cc16', '#eab308', '#6366f1'];
@@ -2015,8 +2019,19 @@
             const mainBody = document.getElementById(`popup-main-body-${currentStopId}`);
             if (!mainBody) return;
 
+            if (!tripId) {
+                let activeStopsMap = getServingRoutesForStop(currentStopId);
+                let tripEntriesArr = activeStopsMap[routeId] || [];
+                if (tripEntriesArr.length > 0) {
+                    tripEntriesArr.sort((a, b) => a.sortTime.localeCompare(b.sortTime));
+                    tripId = stopSelectedTripId[currentStopId] || tripEntriesArr[0].tripId;
+                }
+            }
+
             let trip = gtfsData.trips[tripId];
             if (!trip) return;
+
+            stopSelectedTripId[currentStopId] = tripId;
 
             let tripStops = gtfsData.stopTimes[tripId] || [];
             let rawRouteObj = gtfsData.rawRoutes[routeId] || {};
@@ -2042,11 +2057,16 @@
 
             let destHeadsign = trip.headsign ? `➔ To ${trip.headsign}` : 'Full Itinerary';
 
+            let returnOriginBtn = (inspectedOriginStop && inspectedOriginStop.stopId !== currentStopId) ? `
+                <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToOriginStop()" title="Return to origin stop">↩</button>
+            ` : '';
+
             mainBody.innerHTML = `
                 <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <div style="display: flex; gap: 3px;">
+                    <div style="display: flex; gap: 3px; align-items: center;">
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'start')">📍</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'end')">🏁</button>
+                        ${returnOriginBtn}
                     </div>
                     <div style="display: flex; gap: 3px; align-items: center;">
                         <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToPopupDepartures('${currentStopId}')" title="Back to Departures">◀</button>
@@ -2140,19 +2160,23 @@
             let tripEntriesArr = activeStopsMap[activeRouteId] || [];
             tripEntriesArr.sort((a, b) => a.sortTime.localeCompare(b.sortTime));
 
+            if (!stopSelectedTripId[stopId] || !tripEntriesArr.some(t => t.tripId === stopSelectedTripId[stopId])) {
+                stopSelectedTripId[stopId] = tripEntriesArr.length > 0 ? tripEntriesArr[0].tripId : null;
+            }
+
             let departuresSnippet = '';
             tripEntriesArr.forEach(item => {
                 let destHeadsign = item.headsign ? `➔ To ${item.headsign}` : '';
                 let formattedDepTime = formatTime12h(item.sortTime);
+                let isSelectedTrip = (stopSelectedTripId[stopId] === item.tripId);
 
                 departuresSnippet += `
-                    <div class="popup-departure-card">
+                    <div class="popup-departure-card ${isSelectedTrip ? 'active-selected-trip' : ''}" onclick="selectPopupDepartureTrip('${stopId}', '${activeRouteId}', '${item.tripId}')">
                         <div class="popup-dep-main-row">
                             <div class="popup-dep-time-headsign">
                                 <span class="popup-departure-time" data-time24="${item.sortTime}" style="font-family: monospace; font-weight: bold; font-size: 0.72rem; color: #4ade80;">${formattedDepTime}</span>
                                 <span class="popup-dep-headsign" title="${item.headsign}">${destHeadsign}</span>
                             </div>
-                            <button class="btn-action" style="padding: 3px 7px; font-size: 0.75rem;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${activeRouteId}', '${item.tripId}')" title="View step-by-step itinerary">📋</button>
                         </div>
                     </div>
                 `;
@@ -2171,13 +2195,23 @@
                 `;
             }
 
+            let returnOriginBtn = (inspectedOriginStop && inspectedOriginStop.stopId !== stopId) ? `
+                <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToOriginStop()" title="Return to origin stop">↩</button>
+            ` : '';
+
+            let hasTrips = tripEntriesArr.length > 0;
+
             return `
                 <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <div style="display: flex; gap: 3px;">
+                    <div style="display: flex; gap: 3px; align-items: center;">
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'start')">📍</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'end')">🏁</button>
+                        ${returnOriginBtn}
                     </div>
-                    <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${stopId}')" title="Find Next Route Serving Stop">🔍</button>
+                    <div style="display: flex; gap: 3px; align-items: center;">
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${activeRouteId}', '${stopSelectedTripId[stopId] || ''}')" title="View Itinerary" ${hasTrips ? '' : 'disabled style="opacity:0.4;"'}>📋</button>
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${stopId}')" title="Find Next Route Serving Stop">🔍</button>
+                    </div>
                 </div>
                 ${cyclerBarHtml}
                 <div id="popup-content-view-${stopId}" class="popup-scroll-container">
@@ -2195,6 +2229,15 @@
             `;
         }
 
+        function selectPopupDepartureTrip(stopId, routeId, tripId) {
+            stopSelectedTripId[stopId] = tripId;
+            const mainBody = document.getElementById(`popup-main-body-${stopId}`);
+            if (mainBody) {
+                mainBody.innerHTML = buildDeparturesViewHtml(stopId);
+                updateStopTextColors();
+            }
+        }
+
         function cycleStopRoute(stopId, delta) {
             let activeStopsMap = getServingRoutesForStop(stopId);
             let servingRouteIds = Object.keys(activeStopsMap);
@@ -2203,6 +2246,10 @@
             let curIdx = stopActiveRouteIndex[stopId] || 0;
             curIdx = (curIdx + delta + servingRouteIds.length) % servingRouteIds.length;
             stopActiveRouteIndex[stopId] = curIdx;
+
+            let newRouteId = servingRouteIds[curIdx];
+            let newTrips = activeStopsMap[newRouteId] || [];
+            stopSelectedTripId[stopId] = newTrips.length > 0 ? newTrips[0].tripId : null;
 
             const mainBody = document.getElementById(`popup-main-body-${stopId}`);
             if (mainBody) {
@@ -2223,6 +2270,29 @@
             let stopInfo = gtfsData.stops[targetStopId];
             if (!stopInfo) return;
 
+            // Remember inspected origin stop if moving away from it
+            let currentOpenStopId = null;
+            markersLayer.eachLayer(layer => {
+                if (layer instanceof L.Marker && layer.getPopup() && layer.getPopup().isOpen()) {
+                    let ll = layer.getLatLng();
+                    Object.keys(gtfsData.stops).forEach(sId => {
+                        let st = gtfsData.stops[sId];
+                        if (Math.abs(st.lat - ll.lat) < 0.00001 && Math.abs(st.lng - ll.lng) < 0.00001) {
+                            currentOpenStopId = sId;
+                        }
+                    });
+                }
+            });
+
+            if (currentOpenStopId && currentOpenStopId !== targetStopId) {
+                let origStopInfo = gtfsData.stops[currentOpenStopId];
+                inspectedOriginStop = {
+                    stopId: currentOpenStopId,
+                    lat: origStopInfo ? origStopInfo.lat : origLat,
+                    lng: origStopInfo ? origStopInfo.lng : origLng
+                };
+            }
+
             tempMarkerLayer.clearLayers();
 
             let tempIcon = L.divIcon({ className: 'temp-target-dot', iconSize: [14, 14], iconAnchor: [7, 7] });
@@ -2238,6 +2308,29 @@
                 if (layer instanceof L.Marker) {
                     let ll = layer.getLatLng();
                     if (Math.abs(ll.lat - stopInfo.lat) < 0.00001 && Math.abs(ll.lng - stopInfo.lng) < 0.00001) {
+                        layer.openPopup();
+                    }
+                }
+            });
+
+            updateStopTextColors();
+            setTimeout(updateStopTextColors, 50);
+            setTimeout(updateStopTextColors, 150);
+            setTimeout(updateStopTextColors, 300);
+        }
+
+        function returnToOriginStop() {
+            if (!inspectedOriginStop) return;
+            let orig = inspectedOriginStop;
+            inspectedOriginStop = null;
+            tempMarkerLayer.clearLayers();
+
+            map.setView([orig.lat, orig.lng], 16);
+
+            markersLayer.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    let ll = layer.getLatLng();
+                    if (Math.abs(ll.lat - orig.lat) < 0.00001 && Math.abs(ll.lng - orig.lng) < 0.00001) {
                         layer.openPopup();
                     }
                 }
