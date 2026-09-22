@@ -455,7 +455,7 @@
                 <p><strong>🎯 GPS Button:</strong> Centers and focuses the map on your current GPS location.</p>
                 <p><strong>∞ Infinity Route Exploration Button:</strong> Enters an exploration mode displaying all available transit routes on the map. Tap individual routes to select them; once you tap any blank part of the map (not containing a route), your choices are saved, adding the selected routes to the drop-down menu and removing any unselected ones.</p>
                 <p><strong>🚏 Nearest Route Button:</strong> Finds the closest route and stop relative to your current location.</p>
-                <p><strong>➕ Add Route Button:</strong> Adds an extra route selection dropdown so you can view and compare multiple bus routes on the map simultaneously.</p>
+                <p><strong>➕ Add Route Button:</strong> Adds an extra route selection dropdown so you can view and compare multiple bus routes on the map simultaneously. You can also add multiple instances of the same route with independent start and end stop selections to plan and compare different trip segments at the same time.</p>
                 <p><strong>📅 Calendar Icon:</strong> Displays the currently selected numerical day of the month. Tap to choose a specific schedule date.</p>
                 <p><strong>▲ Toggle Header Button:</strong> Expands or collapses the top header panel to maximize map viewing space.</p>
             </div>
@@ -650,7 +650,8 @@
         }
 
         let gtfsData = { routes: {}, rawRoutes: {}, trips: {}, stops: {}, stopTimes: {}, shapes: {}, calendar: {}, calendarDates: {} };
-        let routePlanners = {}; // routeId -> { startStopId, endStopId, isCollapsed, selectedTripId }
+        let routePlanners = {}; // rowId -> { routeId, startStopId, endStopId, isCollapsed, selectedTripId }
+        let rowIdCounter = 0;
         let stopActiveRouteIndex = {}; // stopId -> active index in routes serving that stop
         let stopSelectedTripId = {}; // stopId -> tripId
         let inspectedOriginStop = null; // { stopId, lat, lng }
@@ -866,7 +867,10 @@
         function addRouteRow(selectedRouteId = '', shouldCenter = false) {
             const container = document.getElementById('route-rows-container');
             const rowDiv = document.createElement('div');
+            rowIdCounter++;
+            const rowId = `row_${rowIdCounter}_${Date.now()}`;
             rowDiv.className = 'controls-row';
+            rowDiv.setAttribute('data-row-id', rowId);
 
             rowDiv.innerHTML = `
                 <button class="remove-row-btn" onclick="removeRouteRow(this)" title="Remove Route">✕</button>
@@ -881,11 +885,23 @@
                 const selectEl = rowDiv.querySelector('.route-select-dropdown');
                 selectEl.value = selectedRouteId;
                 updateRowColorIndicator(selectEl);
+                routePlanners[rowId] = { routeId: selectedRouteId, startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
                 redrawMapLayers(shouldCenter);
             }
         }
 
         function onRouteDropdownChange(selectEl) {
+            const rowDiv = selectEl.closest('.controls-row');
+            const rowId = rowDiv ? rowDiv.getAttribute('data-row-id') : null;
+            if (rowId) {
+                if (selectEl.value) {
+                    if (!routePlanners[rowId] || routePlanners[rowId].routeId !== selectEl.value) {
+                        routePlanners[rowId] = { routeId: selectEl.value, startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
+                    }
+                } else {
+                    delete routePlanners[rowId];
+                }
+            }
             updateRowColorIndicator(selectEl);
             redrawMapLayers(true);
         }
@@ -902,10 +918,10 @@
         function removeRouteRow(btn) {
             const rowDiv = btn.closest('.controls-row');
             const container = document.getElementById('route-rows-container');
+            const rowId = rowDiv ? rowDiv.getAttribute('data-row-id') : null;
 
-            const routeSelect = rowDiv.querySelector('.route-select-dropdown');
-            if (routeSelect && routeSelect.value && routePlanners[routeSelect.value]) {
-                delete routePlanners[routeSelect.value];
+            if (rowId && routePlanners[rowId]) {
+                delete routePlanners[rowId];
             }
 
             if (container.children.length > 1) {
@@ -1156,12 +1172,25 @@
 
         setInterval(updateStopTextColors, 30000);
 
+        function getActiveRouteRows() {
+            const rows = document.querySelectorAll('.controls-row');
+            let activeRows = [];
+            rows.forEach(row => {
+                const rowId = row.getAttribute('data-row-id');
+                const sel = row.querySelector('.route-select-dropdown');
+                if (rowId && sel && sel.value) {
+                    activeRows.push({ rowId, routeId: sel.value });
+                }
+            });
+            return activeRows;
+        }
+
         function getActiveRouteIds() {
-            const selects = document.querySelectorAll('.route-select-dropdown');
+            const activeRows = getActiveRouteRows();
             let activeRouteIds = [];
-            selects.forEach(sel => {
-                if (sel.value && !activeRouteIds.includes(sel.value)) {
-                    activeRouteIds.push(sel.value);
+            activeRows.forEach(item => {
+                if (!activeRouteIds.includes(item.routeId)) {
+                    activeRouteIds.push(item.routeId);
                 }
             });
             return activeRouteIds;
@@ -1174,8 +1203,9 @@
             tempMarkerLayer.clearLayers();
 
             const activeRouteIds = getActiveRouteIds();
+            const activeRouteRows = getActiveRouteRows();
             if (activeRouteIds.length === 0) {
-                renderRoutePanels([]);
+                renderRoutePanels(activeRouteRows);
                 return;
             }
 
@@ -1259,9 +1289,9 @@
 
                     let isStartForAny = false;
                     let isEndForAny = false;
-                    Object.keys(routePlanners).forEach(rId => {
-                        if (routePlanners[rId]?.startStopId === stopId) isStartForAny = true;
-                        if (routePlanners[rId]?.endStopId === stopId) isEndForAny = true;
+                    Object.keys(routePlanners).forEach(rowKey => {
+                        if (routePlanners[rowKey]?.startStopId === stopId) isStartForAny = true;
+                        if (routePlanners[rowKey]?.endStopId === stopId) isEndForAny = true;
                     });
 
                     let markerZIndex = 0;
@@ -1336,18 +1366,18 @@
                 map.fitBounds(routeBounds, { padding: [50, 50] });
             }
 
-            renderRoutePanels(activeRouteIds);
+            renderRoutePanels(activeRouteRows);
         }
 
-        // Helper to retrieve valid trip segments for a given route and date
-        function getValidTripsForRoute(routeId, targetDate) {
-            let planner = routePlanners[routeId];
-            if (!planner || !planner.startStopId || !planner.endStopId) return [];
+        // Helper to retrieve valid trip segments for a given planner row instance and date
+        function getValidTripsForPlannerRow(rowId, targetDate) {
+            let planner = routePlanners[rowId];
+            if (!planner || !planner.routeId || !planner.startStopId || !planner.endStopId) return [];
 
             let validTrips = [];
             Object.keys(gtfsData.trips).forEach(tripId => {
                 let trip = gtfsData.trips[tripId];
-                if (trip.route_id === routeId && isServiceActive(trip.service_id, targetDate)) {
+                if (trip.route_id === planner.routeId && isServiceActive(trip.service_id, targetDate)) {
                     let stops = gtfsData.stopTimes[tripId] || [];
                     let startIndex = -1, endIndex = -1;
                     for (let i = 0; i < stops.length; i++) {
@@ -1406,30 +1436,30 @@
             return pairs;
         }
 
-        // Unified Bi-Directional Propagation Pipeline
-        function propagateJourneyTimeline(activePlannerRouteIds, modifiedIdx) {
+        // Unified Bi-Directional Propagation Pipeline across active planner rows
+        function propagateJourneyTimeline(activePlannerRows, modifiedIdx) {
             const targetDate = getTargetEvaluationDate();
-            let N = activePlannerRouteIds.length;
+            let N = activePlannerRows.length;
             if (N === 0) return;
 
             let validTripsMap = {};
-            activePlannerRouteIds.forEach(rId => {
-                validTripsMap[rId] = getValidTripsForRoute(rId, targetDate);
+            activePlannerRows.forEach(item => {
+                validTripsMap[item.rowId] = getValidTripsForPlannerRow(item.rowId, targetDate);
             });
 
             // 1. Upstream Propagation: from modifiedIdx backwards to 0
             for (let i = modifiedIdx; i > 0; i--) {
-                let downRouteId = activePlannerRouteIds[i];
-                let upRouteId = activePlannerRouteIds[i - 1];
-                let pDown = routePlanners[downRouteId];
-                let pUp = routePlanners[upRouteId];
+                let downRowId = activePlannerRows[i].rowId;
+                let upRowId = activePlannerRows[i - 1].rowId;
+                let pDown = routePlanners[downRowId];
+                let pUp = routePlanners[upRowId];
                 if (!pDown || !pUp || !pUp.endStopId || !pDown.startStopId) continue;
 
                 let transferInfo = getTransferStopInfo(pUp.endStopId, pDown.startStopId);
                 if (!transferInfo || !transferInfo.isTransfer) continue;
 
-                let downTrips = validTripsMap[downRouteId] || [];
-                let upTrips = validTripsMap[upRouteId] || [];
+                let downTrips = validTripsMap[downRowId] || [];
+                let upTrips = validTripsMap[upRowId] || [];
                 if (downTrips.length === 0 || upTrips.length === 0) continue;
 
                 let downSelected = downTrips.find(t => t.tripId === pDown.selectedTripId);
@@ -1443,7 +1473,6 @@
                 let maxArrMins = timeToMins(downSelected.depTime) - walkBufferMins;
 
                 let upSelected = upTrips.find(t => t.tripId === pUp.selectedTripId);
-                // If upstream selection arrives after maxArrMins, adjust backward to latest viable trip arriving in time
                 if (!upSelected || timeToMins(upSelected.arrTime) > maxArrMins) {
                     let viable = upTrips.filter(t => timeToMins(t.arrTime) <= maxArrMins);
                     if (viable.length > 0) {
@@ -1456,17 +1485,17 @@
 
             // 2. Downstream Propagation: from modifiedIdx forward to N - 1
             for (let i = modifiedIdx; i < N - 1; i++) {
-                let upRouteId = activePlannerRouteIds[i];
-                let downRouteId = activePlannerRouteIds[i + 1];
-                let pUp = routePlanners[upRouteId];
-                let pDown = routePlanners[downRouteId];
+                let upRowId = activePlannerRows[i].rowId;
+                let downRowId = activePlannerRows[i + 1].rowId;
+                let pUp = routePlanners[upRowId];
+                let pDown = routePlanners[downRowId];
                 if (!pDown || !pUp || !pUp.endStopId || !pDown.startStopId) continue;
 
                 let transferInfo = getTransferStopInfo(pUp.endStopId, pDown.startStopId);
                 if (!transferInfo || !transferInfo.isTransfer) continue;
 
-                let upTrips = validTripsMap[upRouteId] || [];
-                let downTrips = validTripsMap[downRouteId] || [];
+                let upTrips = validTripsMap[upRowId] || [];
+                let downTrips = validTripsMap[downRowId] || [];
                 if (upTrips.length === 0 || downTrips.length === 0) continue;
 
                 let upSelected = upTrips.find(t => t.tripId === pUp.selectedTripId);
@@ -1480,7 +1509,6 @@
                 let minDepMins = timeToMins(upSelected.arrTime) + walkBufferMins;
 
                 let downSelected = downTrips.find(t => t.tripId === pDown.selectedTripId);
-                // Keep downstream selection if it departs >= minDepMins without forced auto-snapping to earliest
                 if (!downSelected || timeToMins(downSelected.depTime) < minDepMins) {
                     let viable = downTrips.filter(t => timeToMins(t.depTime) >= minDepMins);
                     if (viable.length > 0) {
@@ -1493,45 +1521,45 @@
         }
 
         // Direct trip selection on any leg (upstream, middle, or downstream)
-        function selectLegTrip(routeId, tripId) {
-            if (!routePlanners[routeId]) return;
-            routePlanners[routeId].selectedTripId = tripId;
+        function selectLegTrip(rowId, tripId) {
+            if (!routePlanners[rowId]) return;
+            routePlanners[rowId].selectedTripId = tripId;
 
-            const activeRouteIds = getActiveRouteIds();
-            let activePlannerRouteIds = activeRouteIds.filter(rId => {
-                let p = routePlanners[rId];
+            const activeRouteRows = getActiveRouteRows();
+            let activePlannerRows = activeRouteRows.filter(item => {
+                let p = routePlanners[item.rowId];
                 return p && (p.startStopId || p.endStopId);
             });
 
-            let modIdx = activePlannerRouteIds.indexOf(routeId);
+            let modIdx = activePlannerRows.findIndex(item => item.rowId === rowId);
             if (modIdx !== -1) {
-                propagateJourneyTimeline(activePlannerRouteIds, modIdx);
+                propagateJourneyTimeline(activePlannerRows, modIdx);
             }
-            renderRoutePanels(activeRouteIds);
+            renderRoutePanels(activeRouteRows);
         }
 
         // Generalized multi-leg transfer stepping for any adjacent pair
         function stepTransferPair(transferIdx, delta) {
-            const activeRouteIds = getActiveRouteIds();
+            const activeRouteRows = getActiveRouteRows();
             const targetDate = getTargetEvaluationDate();
-            let activePlannerRouteIds = activeRouteIds.filter(rId => {
-                let p = routePlanners[rId];
+            let activePlannerRows = activeRouteRows.filter(item => {
+                let p = routePlanners[item.rowId];
                 return p && (p.startStopId || p.endStopId);
             });
 
-            if (transferIdx < 0 || transferIdx >= activePlannerRouteIds.length - 1) return;
+            if (transferIdx < 0 || transferIdx >= activePlannerRows.length - 1) return;
 
-            let r1 = activePlannerRouteIds[transferIdx];
-            let r2 = activePlannerRouteIds[transferIdx + 1];
-            let p1 = routePlanners[r1];
-            let p2 = routePlanners[r2];
+            let row1 = activePlannerRows[transferIdx].rowId;
+            let row2 = activePlannerRows[transferIdx + 1].rowId;
+            let p1 = routePlanners[row1];
+            let p2 = routePlanners[row2];
             if (!p1 || !p2 || !p1.endStopId || !p2.startStopId) return;
 
             let transferInfo = getTransferStopInfo(p1.endStopId, p2.startStopId);
             if (!transferInfo || !transferInfo.isTransfer) return;
 
-            let trips1 = getValidTripsForRoute(r1, targetDate);
-            let trips2 = getValidTripsForRoute(r2, targetDate);
+            let trips1 = getValidTripsForPlannerRow(row1, targetDate);
+            let trips2 = getValidTripsForPlannerRow(row2, targetDate);
             let pairs = getAllTransferPairs(trips1, trips2, transferInfo.walkDist);
             if (pairs.length === 0) return;
 
@@ -1553,54 +1581,54 @@
             p1.selectedTripId = chosenPair.t1.tripId;
             p2.selectedTripId = chosenPair.t2.tripId;
 
-            propagateJourneyTimeline(activePlannerRouteIds, transferIdx);
-            propagateJourneyTimeline(activePlannerRouteIds, transferIdx + 1);
+            propagateJourneyTimeline(activePlannerRows, transferIdx);
+            propagateJourneyTimeline(activePlannerRows, transferIdx + 1);
 
-            renderRoutePanels(activeRouteIds);
+            renderRoutePanels(activeRouteRows);
         }
 
         // --- Per-Route Panels & Generalized Interspersed Connection Summary Bars ---
-        function renderRoutePanels(activeRouteIds) {
+        function renderRoutePanels(activeRouteRows) {
             const container = document.getElementById('route-panels-container');
             if (!container) return;
             container.innerHTML = '';
 
-            if (activeRouteIds.length === 0) {
+            if (!activeRouteRows || activeRouteRows.length === 0) {
                 container.style.display = 'none';
                 return;
             }
 
             const targetDate = getTargetEvaluationDate();
-            let activePlannerRouteIds = activeRouteIds.filter(routeId => {
-                let planner = routePlanners[routeId];
+            let activePlannerRows = activeRouteRows.filter(item => {
+                let planner = routePlanners[item.rowId];
                 return planner && (planner.startStopId || planner.endStopId);
             });
 
-            if (activePlannerRouteIds.length === 0) {
+            if (activePlannerRows.length === 0) {
                 container.style.display = 'none';
                 return;
             }
 
             container.style.display = 'flex';
 
-            let allCollapsed = activePlannerRouteIds.every(rId => routePlanners[rId]?.isCollapsed);
+            let allCollapsed = activePlannerRows.every(item => routePlanners[item.rowId]?.isCollapsed);
             if (allCollapsed) {
                 container.classList.add('all-collapsed');
             } else {
                 container.classList.remove('all-collapsed');
             }
 
-            // Pre-calculate valid trips for each route
-            let routeValidTripsMap = {};
-            activePlannerRouteIds.forEach(rId => {
-                routeValidTripsMap[rId] = getValidTripsForRoute(rId, targetDate);
+            // Pre-calculate valid trips for each planner row instance
+            let rowValidTripsMap = {};
+            activePlannerRows.forEach(item => {
+                rowValidTripsMap[item.rowId] = getValidTripsForPlannerRow(item.rowId, targetDate);
             });
 
             // Ensure valid selectedTripId for each active planner leg
             let needsInitialPropagation = false;
-            activePlannerRouteIds.forEach(rId => {
-                let planner = routePlanners[rId];
-                let validTrips = routeValidTripsMap[rId] || [];
+            activePlannerRows.forEach(item => {
+                let planner = routePlanners[item.rowId];
+                let validTrips = rowValidTripsMap[item.rowId] || [];
                 if (validTrips.length > 0) {
                     if (!planner.selectedTripId || !validTrips.some(t => t.tripId === planner.selectedTripId)) {
                         planner.selectedTripId = getDefaultTripForRoute(validTrips, targetDate);
@@ -1612,22 +1640,22 @@
             });
 
             if (needsInitialPropagation) {
-                propagateJourneyTimeline(activePlannerRouteIds, 0);
+                propagateJourneyTimeline(activePlannerRows, 0);
             }
 
             // Pre-calculate transfer info and pairs between all adjacent leg pairs
             let transfersData = [];
-            for (let i = 0; i < activePlannerRouteIds.length - 1; i++) {
-                let r1 = activePlannerRouteIds[i];
-                let r2 = activePlannerRouteIds[i + 1];
-                let p1 = routePlanners[r1];
-                let p2 = routePlanners[r2];
+            for (let i = 0; i < activePlannerRows.length - 1; i++) {
+                let row1 = activePlannerRows[i].rowId;
+                let row2 = activePlannerRows[i + 1].rowId;
+                let p1 = routePlanners[row1];
+                let p2 = routePlanners[row2];
 
                 if (p1?.endStopId && p2?.startStopId) {
                     let transferInfo = getTransferStopInfo(p1.endStopId, p2.startStopId);
                     if (transferInfo) {
-                        let trips1 = routeValidTripsMap[r1] || [];
-                        let trips2 = routeValidTripsMap[r2] || [];
+                        let trips1 = rowValidTripsMap[row1] || [];
+                        let trips2 = rowValidTripsMap[row2] || [];
                         let pairs = getAllTransferPairs(trips1, trips2, transferInfo.walkDist);
 
                         let sel1 = p1.selectedTripId;
@@ -1666,8 +1694,10 @@
             }
 
             // Render Route Cards and Interspersed Generalized Connection Bars
-            activePlannerRouteIds.forEach((routeId, idx) => {
-                let planner = routePlanners[routeId];
+            activePlannerRows.forEach((item, idx) => {
+                let rowId = item.rowId;
+                let routeId = item.routeId;
+                let planner = routePlanners[rowId];
                 let rColor = getRouteColor(routeId);
                 let rawRouteObj = gtfsData.rawRoutes[routeId] || {};
                 let rDisplayName = rawRouteObj.route_short_name ? `Route ${rawRouteObj.route_short_name}` : `Route`;
@@ -1718,7 +1748,7 @@
                     endOptions += `<option value="${sId}" ${endSelected}>${sName}</option>`;
                 });
 
-                let validTrips = routeValidTripsMap[routeId] || [];
+                let validTrips = rowValidTripsMap[rowId] || [];
                 let tripResultsHtml = '';
                 let hasAdjacentTransfer = Boolean(transfersData[idx] || (idx > 0 && transfersData[idx - 1]));
 
@@ -1732,7 +1762,7 @@
                             let badgeLabel = hasAdjacentTransfer ? 'TRANSFER' : 'SELECTED';
 
                             tripResultsHtml += `
-                                <li class="${isSelected ? 'active-conn-trip' : ''}" data-dep="${vt.depTime}" data-arr="${vt.arrTime}" onclick="selectLegTrip('${routeId}', '${vt.tripId}')" style="border-left-color: ${borderLeftColor};">
+                                <li class="${isSelected ? 'active-conn-trip' : ''}" data-dep="${vt.depTime}" data-arr="${vt.arrTime}" onclick="selectLegTrip('${rowId}', '${vt.tripId}')" style="border-left-color: ${borderLeftColor};">
                                     <span style="font-family: monospace; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
                                         <span class="trip-dep-wrap" style="color: ${depColor};">Dep: <span class="dep-time">${vt.depTime}</span></span>
                                         <span style="color: #64748b;">&rarr;</span>
@@ -1753,9 +1783,9 @@
                 cardDiv.style.borderLeft = `4px solid ${rColor}`;
 
                 cardDiv.innerHTML = `
-                    <div class="route-panel-header" onclick="toggleRoutePanel('${routeId}')">
+                    <div class="route-panel-header" onclick="toggleRoutePanel('${rowId}')">
                         <div style="display: flex; gap: 6px; align-items: center;">
-                            <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); clearRoutePlanner('${routeId}')">Clear</button>
+                            <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); clearRoutePlanner('${rowId}')">Clear</button>
                             <span style="color: ${rColor};">${rDisplayName}</span>
                         </div>
                         <span style="color: #06b6d4; font-size: 0.7rem;">${planner.isCollapsed ? '▲' : '▼'}</span>
@@ -1764,11 +1794,11 @@
                         <div class="route-selectors-grid">
                             <div class="route-selector-group">
                                 <label>Start Stop</label>
-                                <select class="route-stop-select" onchange="onRouteStopSelectChange('${routeId}', 'start', this)">${startOptions}</select>
+                                <select class="route-stop-select" onchange="onRouteStopSelectChange('${rowId}', 'start', this)">${startOptions}</select>
                             </div>
                             <div class="route-selector-group">
                                 <label>End Stop</label>
-                                <select class="route-stop-select" onchange="onRouteStopSelectChange('${routeId}', 'end', this)">${endOptions}</select>
+                                <select class="route-stop-select" onchange="onRouteStopSelectChange('${rowId}', 'end', this)">${endOptions}</select>
                             </div>
                         </div>
                         <div style="font-size: 0.65rem; color: #94a3b8; font-weight: bold; margin-top: 2px; flex-shrink: 0;">Scheduled Trips:</div>
@@ -1780,7 +1810,7 @@
                 container.appendChild(cardDiv);
 
                 // Insert generalized Connection Summary Bar across any multi-leg pair
-                if (idx < activePlannerRouteIds.length - 1 && transfersData[idx]) {
+                if (idx < activePlannerRows.length - 1 && transfersData[idx]) {
                     let transData = transfersData[idx];
                     let barDiv = document.createElement('div');
                     barDiv.className = 'transfer-summary-bar';
@@ -1850,46 +1880,67 @@
             });
         }
 
-        function toggleRoutePanel(routeId) {
-            if (!routePlanners[routeId]) return;
-            routePlanners[routeId].isCollapsed = !routePlanners[routeId].isCollapsed;
-            renderRoutePanels(getActiveRouteIds());
+        function toggleRoutePanel(rowId) {
+            if (!routePlanners[rowId]) return;
+            routePlanners[rowId].isCollapsed = !routePlanners[rowId].isCollapsed;
+            renderRoutePanels(getActiveRouteRows());
             setTimeout(() => { map.invalidateSize(); }, 300);
         }
 
         function setRoutePlannerStop(routeId, stopId, type) {
-            if (!routePlanners[routeId]) {
-                routePlanners[routeId] = { startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
+            const activeRows = getActiveRouteRows();
+            let matchingRows = activeRows.filter(r => r.routeId === routeId);
+
+            let targetRowId = null;
+            if (type === 'end') {
+                let rowWithStart = matchingRows.find(r => routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
+                if (rowWithStart) targetRowId = rowWithStart.rowId;
+            } else if (type === 'start') {
+                let emptyRow = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId);
+                if (emptyRow) targetRowId = emptyRow.rowId;
             }
-            routePlanners[routeId].isCollapsed = false;
-            if (type === 'start') {
-                routePlanners[routeId].startStopId = stopId;
-            } else {
-                routePlanners[routeId].endStopId = stopId;
+
+            if (!targetRowId && matchingRows.length > 0) {
+                targetRowId = matchingRows[0].rowId;
             }
-            routePlanners[routeId].selectedTripId = null;
+
+            if (targetRowId) {
+                if (!routePlanners[targetRowId]) {
+                    routePlanners[targetRowId] = { routeId, startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
+                }
+                routePlanners[targetRowId].isCollapsed = false;
+                if (type === 'start') {
+                    routePlanners[targetRowId].startStopId = stopId;
+                } else {
+                    routePlanners[targetRowId].endStopId = stopId;
+                }
+                routePlanners[targetRowId].selectedTripId = null;
+            }
+
             map.closePopup();
             redrawMapLayers(false);
         }
 
-        function onRouteStopSelectChange(routeId, type, selectEl) {
-            if (!routePlanners[routeId]) {
-                routePlanners[routeId] = { startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
+        function onRouteStopSelectChange(rowId, type, selectEl) {
+            if (!routePlanners[rowId]) {
+                const rowDiv = document.querySelector(`.controls-row[data-row-id="${rowId}"]`);
+                const sel = rowDiv ? rowDiv.querySelector('.route-select-dropdown') : null;
+                routePlanners[rowId] = { routeId: sel ? sel.value : '', startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
             }
             if (type === 'start') {
-                routePlanners[routeId].startStopId = selectEl.value || null;
+                routePlanners[rowId].startStopId = selectEl.value || null;
             } else {
-                routePlanners[routeId].endStopId = selectEl.value || null;
+                routePlanners[rowId].endStopId = selectEl.value || null;
             }
-            routePlanners[routeId].selectedTripId = null;
+            routePlanners[rowId].selectedTripId = null;
             redrawMapLayers(false);
         }
 
-        function clearRoutePlanner(routeId) {
-            if (routePlanners[routeId]) {
-                routePlanners[routeId].startStopId = null;
-                routePlanners[routeId].endStopId = null;
-                routePlanners[routeId].selectedTripId = null;
+        function clearRoutePlanner(rowId) {
+            if (routePlanners[rowId]) {
+                routePlanners[rowId].startStopId = null;
+                routePlanners[rowId].endStopId = null;
+                routePlanners[rowId].selectedTripId = null;
             }
             redrawMapLayers(false);
         }
@@ -1906,6 +1957,7 @@
         function enterInfinityMode() {
             isInfinityMode = true;
 
+            routePlanners = {};
             const selects = document.querySelectorAll('.route-select-dropdown');
             selects.forEach(sel => {
                 sel.value = '';
@@ -1990,6 +2042,11 @@
             if (targetSelect) {
                 targetSelect.value = routeId;
                 updateRowColorIndicator(targetSelect);
+                const rowDiv = targetSelect.closest('.controls-row');
+                const rowId = rowDiv ? rowDiv.getAttribute('data-row-id') : null;
+                if (rowId) {
+                    routePlanners[rowId] = { routeId, startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
+                }
             } else {
                 addRouteRow(routeId, false);
             }
@@ -2399,6 +2456,11 @@
                 if (targetSelect) {
                     targetSelect.value = nextRouteToOpen;
                     updateRowColorIndicator(targetSelect);
+                    const rowDiv = targetSelect.closest('.controls-row');
+                    const rowId = rowDiv ? rowDiv.getAttribute('data-row-id') : null;
+                    if (rowId) {
+                        routePlanners[rowId] = { routeId: nextRouteToOpen, startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
+                    }
                     redrawMapLayers(false);
                 } else {
                     addRouteRow(nextRouteToOpen, false);
@@ -2462,6 +2524,11 @@
                     if (targetSelect) {
                         targetSelect.value = matchedRouteId;
                         updateRowColorIndicator(targetSelect);
+                        const rowDiv = targetSelect.closest('.controls-row');
+                        const rowId = rowDiv ? rowDiv.getAttribute('data-row-id') : null;
+                        if (rowId) {
+                            routePlanners[rowId] = { routeId: matchedRouteId, startStopId: null, endStopId: null, isCollapsed: false, selectedTripId: null };
+                        }
                         redrawMapLayers(true);
                     } else {
                         addRouteRow(matchedRouteId, true);
