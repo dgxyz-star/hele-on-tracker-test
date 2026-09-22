@@ -319,8 +319,8 @@
         .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
         .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
         .popup-dep-main-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
-        .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; flex-shrink: 0; }
 
         .popup-itinerary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; }
         .popup-itinerary-title { font-size: 0.7rem; font-weight: bold; color: #38bdf8; }
@@ -1249,10 +1249,10 @@
                                 <div class="popup-departure-card">
                                     <div class="popup-dep-main-row">
                                         <div class="popup-dep-time-headsign">
-                                            <span class="popup-departure-time" data-time24="${item.sortTime}" style="font-family: monospace; font-weight: bold; font-size: 0.72rem; color: #4ade80;">${formattedDepTime}</span>
+                                            <span class="popup-departure-time" data-time24="${item.sortTime}" style="font-family: monospace; font-weight: bold; font-size: 0.72rem; color: #4ade80; flex-shrink: 0;">${formattedDepTime}</span>
                                             <span class="popup-dep-headsign" title="${item.headsign}">${destHeadsign}</span>
                                         </div>
-                                        <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${rId}', '${item.tripId}')" title="View step-by-step route stops">📋 Itinerary</button>
+                                        <button class="btn-action" style="padding: 3px 7px; font-size: 0.75rem; flex-shrink: 0;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${rId}', '${item.tripId}')" title="View step-by-step itinerary">📋</button>
                                     </div>
                                 </div>
                             `;
