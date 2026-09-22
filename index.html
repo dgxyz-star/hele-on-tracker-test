@@ -446,7 +446,7 @@
                 <h3>Map Zooming & Gestures</h3>
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
                 <p><strong>📍 Long-Press Map Location:</strong> Long-press anywhere on the map to automatically find and display the closest route and its nearby stops relative to that location.</p>
-                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Transfer/Overlap stop). Tapping a stop marker on the map opens departures and cycles through all routes serving that stop. Tap 📋 in the top header to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to the origin stop if inspecting remote itinerary stops.</p>
+                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Multi-Route Overlap / Transfer stop). For any stop shared by multiple active routes, a clean route cycler bar appears with ◀ ▶ steppers, and tapping the marker on the map directly advances through each serving route in a continuous loop. Tap 📋 in the popup to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to origin if inspecting remote stops.</p>
             </div>
             <div class="help-section">
                 <h3>Top Control Bar & Floating Menu</h3>
@@ -1294,9 +1294,16 @@
                         if (routePlanners[rowKey]?.endStopId === stopId) isEndForAny = true;
                     });
 
+                    let routesAtStop = activeStopsMap[stopId];
+                    let servingRouteIds = Object.keys(routesAtStop);
+
                     let markerZIndex = 0;
+                    if (servingRouteIds.length > 1) {
+                        finalIconColor = '#94a3b8'; // Multi-route / Overlap stop
+                        iconStrokeColor = '#0f172a';
+                    }
                     if (isStartForAny && isEndForAny) {
-                        finalIconColor = '#94a3b8'; // Overlap / Transfer Stop
+                        finalIconColor = '#94a3b8'; // Start & End Overlap Stop
                         iconStrokeColor = '#0f172a';
                         markerZIndex = 1000;
                     } else if (isStartForAny) {
@@ -1308,9 +1315,6 @@
                         iconStrokeColor = '#ffffff';
                         markerZIndex = 1000;
                     }
-
-                    let routesAtStop = activeStopsMap[stopId];
-                    let servingRouteIds = Object.keys(routesAtStop);
 
                     if (stopActiveRouteIndex[stopId] === undefined || stopActiveRouteIndex[stopId] >= servingRouteIds.length) {
                         stopActiveRouteIndex[stopId] = 0;
@@ -1894,14 +1898,20 @@
             let targetRowId = null;
             if (type === 'end') {
                 let rowWithStart = matchingRows.find(r => routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
-                if (rowWithStart) targetRowId = rowWithStart.rowId;
+                if (rowWithStart) {
+                    targetRowId = rowWithStart.rowId;
+                } else {
+                    let unconfigured = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
+                    targetRowId = unconfigured ? unconfigured.rowId : (matchingRows.length > 0 ? matchingRows[matchingRows.length - 1].rowId : null);
+                }
             } else if (type === 'start') {
-                let emptyRow = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId);
-                if (emptyRow) targetRowId = emptyRow.rowId;
-            }
-
-            if (!targetRowId && matchingRows.length > 0) {
-                targetRowId = matchingRows[0].rowId;
+                let unconfigured = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
+                if (unconfigured) {
+                    targetRowId = unconfigured.rowId;
+                } else {
+                    let rowWithoutStart = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId);
+                    targetRowId = rowWithoutStart ? rowWithoutStart.rowId : (matchingRows.length > 0 ? matchingRows[0].rowId : null);
+                }
             }
 
             if (targetRowId) {
