@@ -311,17 +311,17 @@
         .popup-stop-name { font-weight: bold; color: #06b6d4; font-size: 0.8rem; display: block; line-height: 1.1; }
         .popup-stop-meta { font-size: 0.65rem; color: #94a3b8; margin-bottom: 4px; }
 
-        .popup-scroll-container { max-height: 240px; overflow-y: auto; overflow-x: auto; margin-top: 4px; padding-right: 4px; -webkit-overflow-scrolling: touch; }
-        .popup-route-section { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #334155; }
+        .popup-scroll-container { max-height: 240px; overflow: auto; margin-top: 4px; padding-right: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+        .popup-scroll-container::-webkit-scrollbar { display: none; width: 0; height: 0; }
+        .popup-route-section { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #334155; min-width: max-content; }
         .popup-route-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
         .popup-times-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; margin-bottom: 2px; font-weight: bold; white-space: nowrap; }
-        .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-        .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
-        .popup-dep-main-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
-        .popup-dep-time-headsign::-webkit-scrollbar { display: none; width: 0; height: 0; }
-        .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; flex-shrink: 0; }
+        .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; min-width: max-content; }
+        .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; align-items: center; min-width: max-content; }
+        .popup-dep-main-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; white-space: nowrap; }
+        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; }
 
         .popup-itinerary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; }
         .popup-itinerary-title { font-size: 0.7rem; font-weight: bold; color: #38bdf8; }
@@ -1250,10 +1250,10 @@
                                 <div class="popup-departure-card">
                                     <div class="popup-dep-main-row">
                                         <div class="popup-dep-time-headsign">
-                                            <span class="popup-departure-time" data-time24="${item.sortTime}" style="font-family: monospace; font-weight: bold; font-size: 0.72rem; color: #4ade80; flex-shrink: 0;">${formattedDepTime}</span>
+                                            <span class="popup-departure-time" data-time24="${item.sortTime}" style="font-family: monospace; font-weight: bold; font-size: 0.72rem; color: #4ade80;">${formattedDepTime}</span>
                                             <span class="popup-dep-headsign" title="${item.headsign}">${destHeadsign}</span>
                                         </div>
-                                        <button class="btn-action" style="padding: 3px 7px; font-size: 0.75rem; flex-shrink: 0;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${rId}', '${item.tripId}')" title="View step-by-step itinerary">📋</button>
+                                        <button class="btn-action" style="padding: 3px 7px; font-size: 0.75rem;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${rId}', '${item.tripId}')" title="View step-by-step itinerary">📋</button>
                                     </div>
                                 </div>
                             `;
@@ -2046,23 +2046,102 @@
             updateStopTextColors();
         }
 
-        function returnToPopupDepartures(stopId) {
-            markersLayer.eachLayer(layer => {
-                if (layer instanceof L.Marker) {
-                    let popup = layer.getPopup();
-                    if (popup && popup.isOpen()) {
-                        let stopInfo = gtfsData.stops[stopId];
-                        if (stopInfo) {
-                            let ll = layer.getLatLng();
-                            if (Math.abs(ll.lat - stopInfo.lat) < 0.00001 && Math.abs(ll.lng - stopInfo.lng) < 0.00001) {
-                                layer.closePopup();
-                                redrawMapLayers(false);
-                                setTimeout(() => { layer.openPopup(); }, 50);
-                            }
+        function buildDeparturesViewHtml(stopId) {
+            const activeRouteIds = getActiveRouteIds();
+            const targetDate = getTargetEvaluationDate();
+            let activeStopsMap = {};
+
+            activeRouteIds.forEach(routeId => {
+                let routeObj = gtfsData.rawRoutes[routeId] || {};
+                let longName = routeObj.route_long_name || '';
+
+                Object.keys(gtfsData.trips).forEach(tripId => {
+                    let trip = gtfsData.trips[tripId];
+                    if (trip.route_id === routeId && isServiceActive(trip.service_id, targetDate)) {
+                        let tripStops = gtfsData.stopTimes[tripId];
+                        if (tripStops && tripStops.length > 0) {
+                            tripStops.forEach(st => {
+                                if (st.stop_id === stopId) {
+                                    if (!activeStopsMap[routeId]) {
+                                        activeStopsMap[routeId] = [];
+                                    }
+                                    let localTime = st.dep || st.arr;
+                                    let localLabel = st.dep ? 'D' : 'A';
+                                    if (localTime) {
+                                        let stopSequenceDetails = tripStops.map(tStop => {
+                                            let sMeta = gtfsData.stops[tStop.stop_id];
+                                            let rawName = sMeta ? sMeta.name : 'Unknown Stop';
+                                            return {
+                                                stopId: tStop.stop_id,
+                                                name: cleanStopName(rawName, longName),
+                                                fullName: rawName,
+                                                time: tStop.dep || tStop.arr
+                                            };
+                                        });
+
+                                        activeStopsMap[routeId].push({
+                                            tripId: tripId,
+                                            sortTime: localTime,
+                                            headsign: trip.headsign || '',
+                                            localText: `${localLabel} ${localTime}`,
+                                            tripStops: stopSequenceDetails
+                                        });
+                                    }
+                                }
+                            });
                         }
                     }
-                }
+                });
             });
+
+            let schedulesHtml = '';
+            Object.keys(activeStopsMap).forEach(rId => {
+                let rColor = getRouteColor(rId);
+                let rawRouteObj = gtfsData.rawRoutes[rId] || {};
+                let rDisplayName = rawRouteObj.route_short_name ? `Route ${rawRouteObj.route_short_name}` : `Route`;
+                if (rawRouteObj.route_long_name) rDisplayName += `: ${rawRouteObj.route_long_name}`;
+
+                let tripEntriesArr = activeStopsMap[rId];
+                tripEntriesArr.sort((a, b) => a.sortTime.localeCompare(b.sortTime));
+
+                let departuresSnippet = '';
+                tripEntriesArr.forEach(item => {
+                    let destHeadsign = item.headsign ? `➔ To ${item.headsign}` : '';
+                    let formattedDepTime = formatTime12h(item.sortTime);
+
+                    departuresSnippet += `
+                        <div class="popup-departure-card">
+                            <div class="popup-dep-main-row">
+                                <div class="popup-dep-time-headsign">
+                                    <span class="popup-departure-time" data-time24="${item.sortTime}" style="font-family: monospace; font-weight: bold; font-size: 0.72rem; color: #4ade80;">${formattedDepTime}</span>
+                                    <span class="popup-dep-headsign" title="${item.headsign}">${destHeadsign}</span>
+                                </div>
+                                <button class="btn-action" style="padding: 3px 7px; font-size: 0.75rem;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${rId}', '${item.tripId}')" title="View step-by-step itinerary">📋</button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                schedulesHtml += `
+                    <div class="popup-route-section" style="border-left: 3px solid ${rColor}; padding-left: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                            <span class="popup-times-title" style="color: ${rColor};">${rDisplayName}</span>
+                        </div>
+                        <div class="popup-departures-list">
+                            ${departuresSnippet}
+                        </div>
+                    </div>
+                `;
+            });
+
+            return schedulesHtml || '<div style="color: #94a3b8; font-size: 0.7rem; padding: 4px;">No active departures scheduled for this date.</div>';
+        }
+
+        function returnToPopupDepartures(stopId) {
+            const container = document.getElementById(`popup-content-view-${stopId}`);
+            if (!container) return;
+            container.innerHTML = buildDeparturesViewHtml(stopId);
+            updateStopTextColors();
         }
 
         function jumpToStopLocation(targetStopId, origLat, origLng) {
