@@ -455,7 +455,7 @@
                 <p><strong>🎯 GPS Button:</strong> Centers and focuses the map on your current GPS location.</p>
                 <p><strong>∞ Infinity Route Exploration Button:</strong> Enters an exploration mode displaying all available transit routes on the map. Tap individual routes to select them; once you tap any blank part of the map (not containing a route), your choices are saved, adding the selected routes to the drop-down menu and removing any unselected ones.</p>
                 <p><strong>🚏 Nearest Route Button:</strong> Finds the closest route and stop relative to your current location.</p>
-                <p><strong>➕ Add Route Button:</strong> Adds an extra route selection dropdown so you can view and compare multiple bus routes on the map simultaneously. You can also add multiple instances of the same route with independent start and end stop selections to plan and compare different trip segments at the same time.</p>
+                <p><strong>➕ Add Route Button:</strong> Adds an extra route selection dropdown so you can view and compare multiple bus routes on the map simultaneously. You can also add multiple instances of the same route with independent start and end stop selections to plan and compare different trip segments at the same time. When duplicate instances of a route exist, they are labeled dynamically with instance numbers (e.g., '(1)', '(2)') in both the trip planner headers and stop popup route cyclers, allowing you to set start (📍) and end (🏁) stops for each instance individually.</p>
                 <p><strong>📅 Calendar Icon:</strong> Displays the currently selected numerical day of the month. Tap to choose a specific schedule date.</p>
                 <p><strong>▲ Toggle Header Button:</strong> Expands or collapses the top header panel to maximize map viewing space.</p>
             </div>
@@ -652,7 +652,7 @@
         let gtfsData = { routes: {}, rawRoutes: {}, trips: {}, stops: {}, stopTimes: {}, shapes: {}, calendar: {}, calendarDates: {} };
         let routePlanners = {}; // rowId -> { routeId, startStopId, endStopId, isCollapsed, selectedTripId }
         let rowIdCounter = 0;
-        let stopActiveRouteIndex = {}; // stopId -> active index in routes serving that stop
+        let stopActiveRouteIndex = {}; // stopId -> active index in serving route instances
         let stopSelectedTripId = {}; // stopId -> tripId
         let inspectedOriginStop = null; // { stopId, lat, lng }
         let availableRouteOptionsHtml = '<option value="">Select Route</option>';
@@ -1175,13 +1175,31 @@
         function getActiveRouteRows() {
             const rows = document.querySelectorAll('.controls-row');
             let activeRows = [];
+            let routeCounts = {};
             rows.forEach(row => {
                 const rowId = row.getAttribute('data-row-id');
                 const sel = row.querySelector('.route-select-dropdown');
                 if (rowId && sel && sel.value) {
-                    activeRows.push({ rowId, routeId: sel.value });
+                    let rId = sel.value;
+                    routeCounts[rId] = (routeCounts[rId] || 0) + 1;
+                    activeRows.push({ rowId, routeId: rId });
                 }
             });
+
+            let routeCurrentIndices = {};
+            activeRows.forEach(item => {
+                let rId = item.routeId;
+                let totalCount = routeCounts[rId];
+                if (totalCount > 1) {
+                    routeCurrentIndices[rId] = (routeCurrentIndices[rId] || 0) + 1;
+                    item.instanceNum = routeCurrentIndices[rId];
+                    item.totalInstances = totalCount;
+                } else {
+                    item.instanceNum = null;
+                    item.totalInstances = 1;
+                }
+            });
+
             return activeRows;
         }
 
@@ -1194,6 +1212,16 @@
                 }
             });
             return activeRouteIds;
+        }
+
+        function getRouteDisplayName(routeId, instanceNum = null) {
+            let rawRouteObj = gtfsData.rawRoutes[routeId] || {};
+            let baseName = rawRouteObj.route_short_name ? `Route ${rawRouteObj.route_short_name}` : `Route`;
+            if (rawRouteObj.route_long_name) baseName += `: ${rawRouteObj.route_long_name}`;
+            if (instanceNum !== null && instanceNum !== undefined) {
+                baseName += ` (${instanceNum})`;
+            }
+            return baseName;
         }
 
         function redrawMapLayers(shouldCenter = false) {
@@ -1704,8 +1732,7 @@
                 let planner = routePlanners[rowId];
                 let rColor = getRouteColor(routeId);
                 let rawRouteObj = gtfsData.rawRoutes[routeId] || {};
-                let rDisplayName = rawRouteObj.route_short_name ? `Route ${rawRouteObj.route_short_name}` : `Route`;
-                if (rawRouteObj.route_long_name) rDisplayName += `: ${rawRouteObj.route_long_name}`;
+                let rDisplayName = getRouteDisplayName(routeId, item.instanceNum);
 
                 // Extract all stops for the dropdown selectors
                 let bestTripStops = [];
@@ -1891,26 +1918,28 @@
             setTimeout(() => { map.invalidateSize(); }, 300);
         }
 
-        function setRoutePlannerStop(routeId, stopId, type) {
+        function setRoutePlannerStop(routeId, stopId, type, specificRowId = null) {
             const activeRows = getActiveRouteRows();
-            let matchingRows = activeRows.filter(r => r.routeId === routeId);
+            let targetRowId = specificRowId;
 
-            let targetRowId = null;
-            if (type === 'end') {
-                let rowWithStart = matchingRows.find(r => routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
-                if (rowWithStart) {
-                    targetRowId = rowWithStart.rowId;
-                } else {
+            if (!targetRowId) {
+                let matchingRows = activeRows.filter(r => r.routeId === routeId);
+                if (type === 'end') {
+                    let rowWithStart = matchingRows.find(r => routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
+                    if (rowWithStart) {
+                        targetRowId = rowWithStart.rowId;
+                    } else {
+                        let unconfigured = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
+                        targetRowId = unconfigured ? unconfigured.rowId : (matchingRows.length > 0 ? matchingRows[matchingRows.length - 1].rowId : null);
+                    }
+                } else if (type === 'start') {
                     let unconfigured = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
-                    targetRowId = unconfigured ? unconfigured.rowId : (matchingRows.length > 0 ? matchingRows[matchingRows.length - 1].rowId : null);
-                }
-            } else if (type === 'start') {
-                let unconfigured = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId && !routePlanners[r.rowId]?.endStopId);
-                if (unconfigured) {
-                    targetRowId = unconfigured.rowId;
-                } else {
-                    let rowWithoutStart = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId);
-                    targetRowId = rowWithoutStart ? rowWithoutStart.rowId : (matchingRows.length > 0 ? matchingRows[0].rowId : null);
+                    if (unconfigured) {
+                        targetRowId = unconfigured.rowId;
+                    } else {
+                        let rowWithoutStart = matchingRows.find(r => !routePlanners[r.rowId]?.startStopId);
+                        targetRowId = rowWithoutStart ? rowWithoutStart.rowId : (matchingRows.length > 0 ? matchingRows[0].rowId : null);
+                    }
                 }
             }
 
@@ -2082,13 +2111,13 @@
             }
         });
 
-        function showPopupItinerary(currentStopId, routeId, tripId) {
+        function showPopupItinerary(currentStopId, routeId, tripId, targetRowId = null) {
             const mainBody = document.getElementById(`popup-main-body-${currentStopId}`);
             if (!mainBody) return;
 
             if (!tripId) {
-                let activeStopsMap = getServingRoutesForStop(currentStopId);
-                let tripEntriesArr = activeStopsMap[routeId] || [];
+                let servingData = getServingRouteInstancesForStop(currentStopId);
+                let tripEntriesArr = servingData.stopsMap[routeId] || [];
                 if (tripEntriesArr.length > 0) {
                     tripEntriesArr.sort((a, b) => a.sortTime.localeCompare(b.sortTime));
                     tripId = stopSelectedTripId[currentStopId] || tripEntriesArr[0].tripId;
@@ -2128,11 +2157,13 @@
                 <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToOriginStop()" title="Return to origin stop">↩</button>
             ` : '';
 
+            let rowParam = targetRowId ? `'${targetRowId}'` : 'null';
+
             mainBody.innerHTML = `
                 <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <div style="display: flex; gap: 3px; align-items: center;">
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'start')">📍</button>
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'end')">🏁</button>
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'start', ${rowParam})">📍</button>
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'end', ${rowParam})">🏁</button>
                         ${returnOriginBtn}
                     </div>
                     <div style="display: flex; gap: 3px; align-items: center;">
@@ -2154,75 +2185,87 @@
             updateStopTextColors();
         }
 
-        function getServingRoutesForStop(stopId) {
-            const activeRouteIds = getActiveRouteIds();
+        function getServingRouteInstancesForStop(stopId) {
+            const activeRouteRows = getActiveRouteRows();
             const targetDate = getTargetEvaluationDate();
             let activeStopsMap = {};
 
-            activeRouteIds.forEach(routeId => {
-                let routeObj = gtfsData.rawRoutes[routeId] || {};
-                let longName = routeObj.route_long_name || '';
+            activeRouteRows.forEach(rRow => {
+                let routeId = rRow.routeId;
+                if (!activeStopsMap[routeId]) {
+                    let routeObj = gtfsData.rawRoutes[routeId] || {};
+                    let longName = routeObj.route_long_name || '';
 
-                Object.keys(gtfsData.trips).forEach(tripId => {
-                    let trip = gtfsData.trips[tripId];
-                    if (trip.route_id === routeId && isServiceActive(trip.service_id, targetDate)) {
-                        let tripStops = gtfsData.stopTimes[tripId];
-                        if (tripStops && tripStops.length > 0) {
-                            tripStops.forEach(st => {
-                                if (st.stop_id === stopId) {
-                                    if (!activeStopsMap[routeId]) {
-                                        activeStopsMap[routeId] = [];
-                                    }
-                                    let localTime = st.dep || st.arr;
-                                    let localLabel = st.dep ? 'D' : 'A';
-                                    if (localTime) {
-                                        let stopSequenceDetails = tripStops.map(tStop => {
-                                            let sMeta = gtfsData.stops[tStop.stop_id];
-                                            let rawName = sMeta ? sMeta.name : 'Unknown Stop';
-                                            return {
-                                                stopId: tStop.stop_id,
-                                                name: cleanStopName(rawName, longName),
-                                                fullName: rawName,
-                                                time: tStop.dep || tStop.arr
-                                            };
-                                        });
+                    Object.keys(gtfsData.trips).forEach(tripId => {
+                        let trip = gtfsData.trips[tripId];
+                        if (trip.route_id === routeId && isServiceActive(trip.service_id, targetDate)) {
+                            let tripStops = gtfsData.stopTimes[tripId];
+                            if (tripStops && tripStops.length > 0) {
+                                tripStops.forEach(st => {
+                                    if (st.stop_id === stopId) {
+                                        if (!activeStopsMap[routeId]) {
+                                            activeStopsMap[routeId] = [];
+                                        }
+                                        let localTime = st.dep || st.arr;
+                                        let localLabel = st.dep ? 'D' : 'A';
+                                        if (localTime) {
+                                            let stopSequenceDetails = tripStops.map(tStop => {
+                                                let sMeta = gtfsData.stops[tStop.stop_id];
+                                                let rawName = sMeta ? sMeta.name : 'Unknown Stop';
+                                                return {
+                                                    stopId: tStop.stop_id,
+                                                    name: cleanStopName(rawName, longName),
+                                                    fullName: rawName,
+                                                    time: tStop.dep || tStop.arr
+                                                };
+                                            });
 
-                                        activeStopsMap[routeId].push({
-                                            tripId: tripId,
-                                            sortTime: localTime,
-                                            headsign: trip.headsign || '',
-                                            localText: `${localLabel} ${localTime}`,
-                                            tripStops: stopSequenceDetails
-                                        });
+                                            activeStopsMap[routeId].push({
+                                                tripId: tripId,
+                                                sortTime: localTime,
+                                                headsign: trip.headsign || '',
+                                                localText: `${localLabel} ${localTime}`,
+                                                tripStops: stopSequenceDetails
+                                            });
+                                        }
                                     }
-                                }
-                            });
+                                });
+                            }
                         }
-                    }
-                });
+                    });
+                }
             });
 
-            return activeStopsMap;
+            // Build array of serving row instances preserving duplicate row identities
+            let servingInstances = [];
+            activeRouteRows.forEach(rRow => {
+                if (activeStopsMap[rRow.routeId] && activeStopsMap[rRow.routeId].length > 0) {
+                    servingInstances.push(rRow);
+                }
+            });
+
+            return { instances: servingInstances, stopsMap: activeStopsMap };
         }
 
         function buildDeparturesViewHtml(stopId) {
-            let activeStopsMap = getServingRoutesForStop(stopId);
-            let servingRouteIds = Object.keys(activeStopsMap);
+            let servingData = getServingRouteInstancesForStop(stopId);
+            let servingInstances = servingData.instances;
+            let activeStopsMap = servingData.stopsMap;
 
-            if (servingRouteIds.length === 0) {
+            if (servingInstances.length === 0) {
                 return '<div style="color: #94a3b8; font-size: 0.7rem; padding: 4px;">No active departures scheduled for this date.</div>';
             }
 
-            if (stopActiveRouteIndex[stopId] === undefined || stopActiveRouteIndex[stopId] >= servingRouteIds.length) {
+            if (stopActiveRouteIndex[stopId] === undefined || stopActiveRouteIndex[stopId] >= servingInstances.length) {
                 stopActiveRouteIndex[stopId] = 0;
             }
 
-            let curRouteIdx = stopActiveRouteIndex[stopId];
-            let activeRouteId = servingRouteIds[curRouteIdx];
+            let curInstanceIdx = stopActiveRouteIndex[stopId];
+            let activeInstance = servingInstances[curInstanceIdx];
+            let activeRouteId = activeInstance.routeId;
+            let targetRowId = activeInstance.rowId;
             let rColor = getRouteColor(activeRouteId);
-            let rawRouteObj = gtfsData.rawRoutes[activeRouteId] || {};
-            let rDisplayName = rawRouteObj.route_short_name ? `Route ${rawRouteObj.route_short_name}` : `Route`;
-            if (rawRouteObj.route_long_name) rDisplayName += `: ${rawRouteObj.route_long_name}`;
+            let rDisplayName = getRouteDisplayName(activeRouteId, activeInstance.instanceNum);
 
             let tripEntriesArr = activeStopsMap[activeRouteId] || [];
             tripEntriesArr.sort((a, b) => a.sortTime.localeCompare(b.sortTime));
@@ -2250,10 +2293,10 @@
             });
 
             let cyclerBarHtml = '';
-            if (servingRouteIds.length > 1) {
+            if (servingInstances.length > 1) {
                 cyclerBarHtml = `
                     <div class="popup-route-cycler-bar">
-                        <span class="popup-route-cycler-title" style="color: ${rColor};" title="${rDisplayName}">${rDisplayName} (${curRouteIdx + 1} of ${servingRouteIds.length})</span>
+                        <span class="popup-route-cycler-title" style="color: ${rColor};" title="${rDisplayName}">${rDisplayName} (${curInstanceIdx + 1} of ${servingInstances.length})</span>
                         <div class="popup-route-stepper-btns">
                             <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', -1)" title="Previous Route">◀</button>
                             <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', 1)" title="Next Route">▶</button>
@@ -2267,23 +2310,24 @@
             ` : '';
 
             let hasTrips = tripEntriesArr.length > 0;
+            let rowParam = targetRowId ? `'${targetRowId}'` : 'null';
 
             return `
                 <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <div style="display: flex; gap: 3px; align-items: center;">
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'start')">📍</button>
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'end')">🏁</button>
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'start', ${rowParam})">📍</button>
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'end', ${rowParam})">🏁</button>
                         ${returnOriginBtn}
                     </div>
                     <div style="display: flex; gap: 3px; align-items: center;">
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${activeRouteId}', '${stopSelectedTripId[stopId] || ''}')" title="View Itinerary" ${hasTrips ? '' : 'disabled style="opacity:0.4;"'}>📋</button>
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${activeRouteId}', '${stopSelectedTripId[stopId] || ''}', ${rowParam})" title="View Itinerary" ${hasTrips ? '' : 'disabled style="opacity:0.4;"'}>📋</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${stopId}')" title="Find Next Route Serving Stop">🔍</button>
                     </div>
                 </div>
                 ${cyclerBarHtml}
                 <div id="popup-content-view-${stopId}" class="popup-scroll-container">
                     <div class="popup-route-section" style="border-left: 3px solid ${rColor}; padding-left: 6px;">
-                        ${servingRouteIds.length === 1 ? `
+                        ${servingInstances.length === 1 ? `
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                                 <span class="popup-times-title" style="color: ${rColor};">${rDisplayName}</span>
                             </div>
@@ -2306,16 +2350,17 @@
         }
 
         function cycleStopRoute(stopId, delta) {
-            let activeStopsMap = getServingRoutesForStop(stopId);
-            let servingRouteIds = Object.keys(activeStopsMap);
-            if (servingRouteIds.length <= 1) return;
+            let servingData = getServingRouteInstancesForStop(stopId);
+            let servingInstances = servingData.instances;
+            if (servingInstances.length <= 1) return;
 
             let curIdx = stopActiveRouteIndex[stopId] || 0;
-            curIdx = (curIdx + delta + servingRouteIds.length) % servingRouteIds.length;
+            curIdx = (curIdx + delta + servingInstances.length) % servingInstances.length;
             stopActiveRouteIndex[stopId] = curIdx;
 
-            let newRouteId = servingRouteIds[curIdx];
-            let newTrips = activeStopsMap[newRouteId] || [];
+            let newInstance = servingInstances[curIdx];
+            let newRouteId = newInstance.routeId;
+            let newTrips = servingData.stopsMap[newRouteId] || [];
             stopSelectedTripId[stopId] = newTrips.length > 0 ? newTrips[0].tripId : null;
 
             const mainBody = document.getElementById(`popup-main-body-${stopId}`);
