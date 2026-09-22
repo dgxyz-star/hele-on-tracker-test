@@ -319,7 +319,8 @@
         .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
         .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
         .popup-dep-main-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+        .popup-dep-time-headsign::-webkit-scrollbar { display: none; width: 0; height: 0; }
         .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; flex-shrink: 0; }
 
         .popup-itinerary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; }
@@ -408,7 +409,7 @@
                 <h3>Map Zooming & Gestures</h3>
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
                 <p><strong>📍 Long-Press Map Location:</strong> Long-press anywhere on the map to automatically find and display the closest route and its nearby stops relative to that location.</p>
-                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Bus stops are represented on the map as directional arrowhead icons. The tip of each arrow points in the exact direction the bus is traveling at that specific stop, helping you easily identify which side of the street or travel direction you are viewing. <em>Tap on any stop arrow to open its pop-up window and view the full text list of stops and times for that route.</em></p>
+                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction. Tap any stop marker to view upcoming departures (swipe destination text to read long names) and tap 📋 to view full trip itineraries or ◀ to return.</p>
             </div>
             <div class="help-section">
                 <h3>Top Control Bar & Floating Menu</h3>
@@ -2034,7 +2035,7 @@
             container.innerHTML = `
                 <div class="popup-itinerary-header">
                     <span class="popup-itinerary-title">${destHeadsign}</span>
-                    <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); returnToPopupDepartures('${currentStopId}')">◀ Back to Departures</button>
+                    <button class="btn-action" style="padding: 3px 7px; font-size: 0.75rem;" onclick="event.stopPropagation(); returnToPopupDepartures('${currentStopId}')" title="Back to Departures">◀</button>
                 </div>
                 <div style="font-size:0.6rem; color:#94a3b8; margin-bottom:4px;">Tap any stop below to view on map:</div>
                 <ul class="popup-times-list">
