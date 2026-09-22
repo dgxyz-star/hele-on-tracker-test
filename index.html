@@ -326,8 +326,8 @@
         .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
         .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; }
 
-        .popup-itinerary-header { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; }
-        .popup-itinerary-title { font-size: 0.7rem; font-weight: bold; color: #38bdf8; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .popup-itinerary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; }
+        .popup-itinerary-title { font-size: 0.7rem; font-weight: bold; color: #38bdf8; }
         .popup-times-list { list-style-type: none; padding-left: 0; min-width: max-content; }
         .popup-times-list li { background: #0f172a; padding: 4px 8px; margin-bottom: 2px; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
         .popup-times-list li:hover { background: #334155; }
@@ -1209,19 +1209,15 @@
                         if (routePlanners[rId]?.endStopId === stopId) isEndForAny = true;
                     });
 
-                    let markerZIndex = 0;
                     if (isStartForAny && isEndForAny) {
                         finalIconColor = '#94a3b8'; // Overlap / Transfer Stop
                         iconStrokeColor = '#0f172a';
-                        markerZIndex = 1000;
                     } else if (isStartForAny) {
                         finalIconColor = '#ffffff'; // Start Stop
                         iconStrokeColor = '#0f172a';
-                        markerZIndex = 1000;
                     } else if (isEndForAny) {
                         finalIconColor = '#000000'; // End Stop
                         iconStrokeColor = '#ffffff';
-                        markerZIndex = 1000;
                     }
 
                     let routesAtStop = activeStopsMap[stopId];
@@ -1257,7 +1253,7 @@
                         popupAnchor: [0, -10]
                     });
 
-                    let marker = L.marker([stopInfo.lat, stopInfo.lng], { icon: svgArrowIcon, zIndexOffset: markerZIndex }).bindPopup(popupContent);
+                    let marker = L.marker([stopInfo.lat, stopInfo.lng], { icon: svgArrowIcon }).bindPopup(popupContent);
 
                     marker.on('click', (e) => {
                         let popup = marker.getPopup();
@@ -1961,8 +1957,8 @@
         });
 
         function showPopupItinerary(currentStopId, routeId, tripId) {
-            const mainBody = document.getElementById(`popup-main-body-${currentStopId}`);
-            if (!mainBody) return;
+            const container = document.getElementById(`popup-content-view-${currentStopId}`);
+            if (!container) return;
 
             let trip = gtfsData.trips[tripId];
             if (!trip) return;
@@ -1970,6 +1966,7 @@
             let tripStops = gtfsData.stopTimes[tripId] || [];
             let rawRouteObj = gtfsData.rawRoutes[routeId] || {};
             let rColor = getRouteColor(routeId);
+            let targetDate = getTargetEvaluationDate();
 
             let stopsSnippet = tripStops.map(tStop => {
                 let sMeta = gtfsData.stops[tStop.stop_id];
@@ -1989,26 +1986,17 @@
                 `;
             }).join('');
 
-            let destHeadsign = trip.headsign ? `➔ To ${trip.headsign}` : 'Full Itinerary';
+            let destHeadsign = trip.headsign ? `To ${trip.headsign}` : 'Full Itinerary';
 
-            mainBody.innerHTML = `
-                <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <div style="display: flex; gap: 3px;">
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToPopupDepartures('${currentStopId}')" title="Back to Departures">◀</button>
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'start')">📍</button>
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'end')">🏁</button>
-                    </div>
-                    <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${currentStopId}')" title="Find Next Route Serving Stop">🔍</button>
-                </div>
+            container.innerHTML = `
                 <div class="popup-itinerary-header">
                     <span class="popup-itinerary-title">${destHeadsign}</span>
+                    <button class="btn-action" style="padding: 3px 7px; font-size: 0.75rem;" onclick="event.stopPropagation(); returnToPopupDepartures('${currentStopId}')" title="Back to Departures">◀</button>
                 </div>
-                <div id="popup-content-view-${currentStopId}" class="popup-scroll-container">
-                    <div style="font-size:0.6rem; color:#94a3b8; margin-bottom:4px;">Tap any stop below to view on map:</div>
-                    <ul class="popup-times-list">
-                        ${stopsSnippet}
-                    </ul>
-                </div>
+                <div style="font-size:0.6rem; color:#94a3b8; margin-bottom:4px;">Tap any stop below to view on map:</div>
+                <ul class="popup-times-list">
+                    ${stopsSnippet}
+                </ul>
             `;
 
             updateStopTextColors();
