@@ -39,10 +39,40 @@
             flex-shrink: 0;
         }
 
-        /* Calendar icon button wrapper */
-        .calendar-btn-wrapper { position: relative; }
-        .date-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-        .calendar-icon { font-size: 0.8rem; color: #06b6d4; pointer-events: none; display: flex; align-items: center; justify-content: center; line-height: 1; }
+        /* Calendar icon button wrapper & dynamic date badge */
+        .calendar-btn-wrapper { position: relative; overflow: hidden; }
+        .date-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2; }
+        .calendar-badge {
+            width: 22px;
+            height: 22px;
+            background: #0f172a;
+            border: 1px solid #0284c7;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            pointer-events: none;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+        .calendar-badge-top {
+            width: 100%;
+            height: 6px;
+            background: #0284c7;
+            flex-shrink: 0;
+        }
+        .calendar-badge-day {
+            flex: 1;
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: #38bdf8;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
 
         #route-rows-container { display: flex; flex-direction: column; gap: 4px; width: 100%; min-width: 0; }
         .controls-row { display: flex; gap: 4px; width: 100%; min-width: 0; align-items: center; }
@@ -86,12 +116,8 @@
             line-height: 1;
             flex-shrink: 0;
         }
-        .floating-left-container .calendar-icon {
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
+        .floating-left-container .calendar-badge {
+            pointer-events: none;
         }
 
         /* Full Window Help Overlay Page */
@@ -343,8 +369,11 @@
     <div class="floating-left-container">
         <button class="action-top-btn" onclick="toggleQrModal()" title="Share QR Code">🔲</button>
         <div class="calendar-btn-wrapper" title="Select Date">
-            <select class="date-select" id="date-select-floating" onchange="syncDateSelects(this); redrawMapLayers(false)"></select>
-            <span class="calendar-icon">📅</span>
+            <select class="date-select" id="date-select-floating" onchange="syncDateSelects(this); redrawMapLayers(false);"></select>
+            <div class="calendar-badge">
+                <div class="calendar-badge-top"></div>
+                <div class="calendar-badge-day calendar-day-number">--</div>
+            </div>
         </div>
         <button class="action-top-btn" onclick="toggleHelpOverlay()" title="Guide & Help">📝</button>
     </div>
@@ -363,8 +392,11 @@
                 <div class="header-left-group">
                     <button class="action-top-btn" onclick="toggleQrModal()" title="Share QR Code">🔲</button>
                     <div class="calendar-btn-wrapper" title="Select Date">
-                        <select class="date-select" id="date-select-header" onchange="syncDateSelects(this); redrawMapLayers(false)"></select>
-                        <span class="calendar-icon">📅</span>
+                        <select class="date-select" id="date-select-header" onchange="syncDateSelects(this); redrawMapLayers(false);"></select>
+                        <div class="calendar-badge">
+                            <div class="calendar-badge-top"></div>
+                            <div class="calendar-badge-day calendar-day-number">--</div>
+                        </div>
                     </div>
                     <button class="action-top-btn" onclick="toggleHelpOverlay()" title="Guide & Help">📝</button>
                 </div>
@@ -422,7 +454,7 @@
                 <p><strong>∞ Infinity Route Exploration Button:</strong> Enters an exploration mode displaying all available transit routes on the map. Tap individual routes to select them; once you tap any blank part of the map (not containing a route), your choices are saved, adding the selected routes to the drop-down menu and removing any unselected ones.</p>
                 <p><strong>🚏 Nearest Route Button:</strong> Finds the closest route and stop relative to your current location.</p>
                 <p><strong>➕ Add Route Button:</strong> Adds an extra route selection dropdown so you can view and compare multiple bus routes on the map simultaneously.</p>
-                <p><strong>📅 Calendar Icon:</strong> Tap to pick a specific schedule date.</p>
+                <p><strong>📅 Calendar Icon:</strong> Displays the currently selected numerical day of the month. Tap to choose a specific schedule date.</p>
                 <p><strong>▲ Toggle Header Button:</strong> Expands or collapses the top header panel to maximize map viewing space.</p>
             </div>
             <div class="help-section">
@@ -471,6 +503,18 @@
             });
         }
 
+        function updateCalendarDateDisplay(dateStr) {
+            let dayNum = '--';
+            if (dateStr && dateStr.length === 8) {
+                dayNum = String(parseInt(dateStr.substring(6, 8), 10));
+            } else {
+                dayNum = String(new Date().getDate());
+            }
+            document.querySelectorAll('.calendar-day-number').forEach(el => {
+                el.textContent = dayNum;
+            });
+        }
+
         function syncDateSelects(changedEl) {
             const val = changedEl.value;
             const dateSelects = document.querySelectorAll('.date-select');
@@ -479,6 +523,7 @@
                     ds.value = val;
                 }
             });
+            updateCalendarDateDisplay(val);
         }
 
         // Coordinates for Big Island of Hawaii Fallback
@@ -804,6 +849,12 @@
             dateSelects.forEach(ds => {
                 ds.innerHTML = dateOptionsHtml;
             });
+
+            if (dateSelects.length > 0 && dateSelects[0].value) {
+                updateCalendarDateDisplay(dateSelects[0].value);
+            } else {
+                updateCalendarDateDisplay('');
+            }
 
             addRouteRow('', false);
         }
@@ -1994,11 +2045,13 @@
             mainBody.innerHTML = `
                 <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <div style="display: flex; gap: 3px;">
-                        <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToPopupDepartures('${currentStopId}')" title="Back to Departures">◀</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'start')">📍</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'end')">🏁</button>
                     </div>
-                    <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${currentStopId}')" title="Find Next Route Serving Stop">🔍</button>
+                    <div style="display: flex; gap: 3px; align-items: center;">
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToPopupDepartures('${currentStopId}')" title="Back to Departures">◀</button>
+                        <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${currentStopId}')" title="Find Next Route Serving Stop">🔍</button>
+                    </div>
                 </div>
                 <div class="popup-itinerary-header">
                     <span class="popup-itinerary-title">${destHeadsign}</span>
