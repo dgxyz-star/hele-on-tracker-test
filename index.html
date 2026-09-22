@@ -336,16 +336,12 @@
         .popup-header-row { margin-bottom: 4px; }
         .popup-stop-name { font-weight: bold; color: #06b6d4; font-size: 0.8rem; display: block; line-height: 1.1; }
         .popup-stop-meta { font-size: 0.65rem; color: #94a3b8; margin-bottom: 4px; }
-        .popup-route-cycler-bar { display: flex; justify-content: space-between; align-items: center; background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; margin-bottom: 6px; }
-        .popup-route-cycler-title { font-size: 0.68rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
-        .popup-route-stepper-btns { display: flex; gap: 3px; align-items: center; flex-shrink: 0; }
-
-        .popup-scroll-container { max-height: 240px; overflow: auto; margin-top: 4px; padding-right: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+        .popup-scroll-container { max-height: 240px; overflow: auto; margin-top: 4px; padding-right: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; width: 100%; }
         .popup-scroll-container::-webkit-scrollbar { display: none; width: 0; height: 0; }
-        .popup-route-section { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #334155; min-width: max-content; }
+        .popup-route-section { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #334155; min-width: max-content; width: max-content; }
         .popup-route-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
-        .popup-times-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; margin-bottom: 2px; font-weight: bold; white-space: nowrap; }
+        .popup-times-title { font-size: 0.68rem; font-weight: bold; margin-bottom: 4px; white-space: nowrap; display: block; }
         .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; min-width: max-content; }
         .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; align-items: center; min-width: max-content; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
         .popup-departure-card:hover { background: #1e293b; border-color: #475569; }
@@ -446,7 +442,7 @@
                 <h3>Map Zooming & Gestures</h3>
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
                 <p><strong>📍 Long-Press Map Location:</strong> Long-press anywhere on the map to automatically find and display the closest route and its nearby stops relative to that location.</p>
-                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Multi-Route Overlap / Transfer stop). For any stop shared by multiple active routes, a clean route cycler bar appears with ◀ ▶ steppers, and tapping the marker on the map directly advances through each serving route in a continuous loop. Tap 📋 in the popup to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to origin if inspecting remote stops.</p>
+                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Multi-Route Overlap / Transfer stop). For any stop shared by multiple active routes, ◀ and ▶ steppers appear in the top action row alongside 📍, 🏁, 📋, and 🔍, and tapping the marker on the map directly advances through each serving route in a continuous loop. The route title and departures list scroll both vertically and horizontally so long route and stop names can be read in full. Tap 📋 in the popup to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to origin if inspecting remote stops.</p>
             </div>
             <div class="help-section">
                 <h3>Top Control Bar & Floating Menu</h3>
@@ -455,7 +451,7 @@
                 <p><strong>🎯 GPS Button:</strong> Centers and focuses the map on your current GPS location.</p>
                 <p><strong>∞ Infinity Route Exploration Button:</strong> Enters an exploration mode displaying all available transit routes on the map. Tap individual routes to select them; once you tap any blank part of the map (not containing a route), your choices are saved, adding the selected routes to the drop-down menu and removing any unselected ones.</p>
                 <p><strong>🚏 Nearest Route Button:</strong> Finds the closest route and stop relative to your current location.</p>
-                <p><strong>➕ Add Route Button:</strong> Adds an extra route selection dropdown so you can view and compare multiple bus routes on the map simultaneously. You can also add multiple instances of the same route with independent start and end stop selections to plan and compare different trip segments at the same time. When duplicate instances of a route exist, they are labeled dynamically with instance numbers (e.g., '(1)', '(2)') in both the trip planner headers and stop popup route cyclers, allowing you to set start (📍) and end (🏁) stops for each instance individually.</p>
+                <p><strong>➕ Add Route Button:</strong> Adds an extra route selection dropdown so you can view and compare multiple bus routes on the map simultaneously. You can also add multiple instances of the same route with independent start and end stop selections to plan and compare different trip segments at the same time. When duplicate instances of a route exist, they are prefixed dynamically with instance numbers (e.g., '(1) 402: Hawaiian Paradise Park...', 'Route (1) 402: ...') in the top route dropdowns, bottom planner headers, and stop popup titles, allowing you to set start (📍) and end (🏁) stops for each instance individually.</p>
                 <p><strong>📅 Calendar Icon:</strong> Displays the currently selected numerical day of the month. Tap to choose a specific schedule date.</p>
                 <p><strong>▲ Toggle Header Button:</strong> Expands or collapses the top header panel to maximize map viewing space.</p>
             </div>
@@ -1216,12 +1212,62 @@
 
         function getRouteDisplayName(routeId, instanceNum = null) {
             let rawRouteObj = gtfsData.rawRoutes[routeId] || {};
-            let baseName = rawRouteObj.route_short_name ? `Route ${rawRouteObj.route_short_name}` : `Route`;
+            let prefix = (instanceNum !== null && instanceNum !== undefined) ? ` (${instanceNum})` : ``;
+            let baseName = rawRouteObj.route_short_name ? `Route${prefix} ${rawRouteObj.route_short_name}` : `Route${prefix}`;
             if (rawRouteObj.route_long_name) baseName += `: ${rawRouteObj.route_long_name}`;
-            if (instanceNum !== null && instanceNum !== undefined) {
-                baseName += ` (${instanceNum})`;
-            }
             return baseName;
+        }
+
+        function refreshRouteDropdownOptions() {
+            const rows = document.querySelectorAll('.controls-row');
+            let routeCounts = {};
+            rows.forEach(row => {
+                const sel = row.querySelector('.route-select-dropdown');
+                if (sel && sel.value) {
+                    routeCounts[sel.value] = (routeCounts[sel.value] || 0) + 1;
+                }
+            });
+
+            let routeRunningIndex = {};
+            rows.forEach(row => {
+                const sel = row.querySelector('.route-select-dropdown');
+                if (!sel) return;
+                const curVal = sel.value;
+                let instanceNum = null;
+                if (curVal && routeCounts[curVal] > 1) {
+                    routeRunningIndex[curVal] = (routeRunningIndex[curVal] || 0) + 1;
+                    instanceNum = routeRunningIndex[curVal];
+                }
+
+                let sortedRoutes = Object.keys(gtfsData.routes).map(id => {
+                    let raw = gtfsData.rawRoutes[id] || {};
+                    return {
+                        id,
+                        name: gtfsData.routes[id],
+                        shortName: raw.route_short_name || ''
+                    };
+                });
+
+                sortedRoutes.sort((a, b) => {
+                    let numA = parseFloat(a.shortName);
+                    let numB = parseFloat(b.shortName);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        if (numA !== numB) return numA - numB;
+                    }
+                    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+                let optsHtml = '<option value="">Select Route</option>';
+                sortedRoutes.forEach(r => {
+                    let label = r.name;
+                    if (r.id === curVal && instanceNum !== null) {
+                        label = `(${instanceNum}) ${r.name}`;
+                    }
+                    optsHtml += `<option value="${r.id}">${label}</option>`;
+                });
+                sel.innerHTML = optsHtml;
+                sel.value = curVal;
+            });
         }
 
         function redrawMapLayers(shouldCenter = false) {
@@ -1398,6 +1444,7 @@
                 map.fitBounds(routeBounds, { padding: [50, 50] });
             }
 
+            refreshRouteDropdownOptions();
             renderRoutePanels(activeRouteRows);
         }
 
@@ -2309,6 +2356,14 @@
                 <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToOriginStop()" title="Return to origin stop">↩</button>
             ` : '';
 
+            let cyclerNavBtns = '';
+            if (servingInstances.length > 1) {
+                cyclerNavBtns = `
+                    <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', -1)" title="Previous Route">◀</button>
+                    <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', 1)" title="Next Route">▶</button>
+                `;
+            }
+
             let hasTrips = tripEntriesArr.length > 0;
             let rowParam = targetRowId ? `'${targetRowId}'` : 'null';
 
@@ -2320,18 +2375,14 @@
                         ${returnOriginBtn}
                     </div>
                     <div style="display: flex; gap: 3px; align-items: center;">
+                        ${cyclerNavBtns}
                         <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${activeRouteId}', '${stopSelectedTripId[stopId] || ''}', ${rowParam})" title="View Itinerary" ${hasTrips ? '' : 'disabled style="opacity:0.4;"'}>📋</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${stopId}')" title="Find Next Route Serving Stop">🔍</button>
                     </div>
                 </div>
-                ${cyclerBarHtml}
                 <div id="popup-content-view-${stopId}" class="popup-scroll-container">
                     <div class="popup-route-section" style="border-left: 3px solid ${rColor}; padding-left: 6px;">
-                        ${servingInstances.length === 1 ? `
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                                <span class="popup-times-title" style="color: ${rColor};">${rDisplayName}</span>
-                            </div>
-                        ` : ''}
+                        <span class="popup-times-title" style="color: ${rColor};">${rDisplayName}</span>
                         <div class="popup-departures-list">
                             ${departuresSnippet}
                         </div>
