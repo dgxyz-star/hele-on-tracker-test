@@ -350,8 +350,11 @@
         .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
         .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; }
 
-        .popup-itinerary-header { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; }
+        .popup-itinerary-header { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 3px; }
+        .popup-itinerary-title-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
         .popup-itinerary-title { font-size: 0.7rem; font-weight: bold; color: #38bdf8; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .popup-itinerary-badges { display: flex; align-items: center; gap: 4px; font-size: 0.62rem; color: #94a3b8; font-weight: normal; }
+        .popup-itinerary-badge { background: #0f172a; border: 1px solid #334155; border-radius: 3px; padding: 1px 4px; color: #cbd5e1; font-family: monospace; }
         .popup-times-list { list-style-type: none; padding-left: 0; min-width: max-content; }
         .popup-times-list li { background: #0f172a; padding: 4px 8px; margin-bottom: 2px; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
         .popup-times-list li:hover { background: #334155; }
@@ -438,6 +441,13 @@
             <button class="btn-action" onclick="toggleHelpOverlay()">Close ✕</button>
         </div>
         <div class="help-body">
+            <div class="help-section" style="background: rgba(15, 23, 42, 0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <strong style="color: #38bdf8; font-size: 0.8rem; display: block;">🕒 Time Display Preference</strong>
+                    <span style="font-size: 0.7rem; color: #94a3b8;">Choose between 12-hour AM/PM and 24-hour military format.</span>
+                </div>
+                <button class="btn-action" id="help-time-format-toggle-btn" style="padding: 5px 10px; font-size: 0.72rem;" onclick="toggleTimeFormatPreference()">Format: 24h</button>
+            </div>
             <div class="help-section">
                 <h3>Map Zooming & Gestures</h3>
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
@@ -654,6 +664,30 @@
         let inspectedOriginStop = null; // { stopId, lat, lng }
         let availableRouteOptionsHtml = '<option value="">Select Route</option>';
 
+        let use24HourTime = localStorage.getItem('hele_on_use_24h') !== null ? (localStorage.getItem('hele_on_use_24h') === 'true') : true;
+
+        function updateTimeFormatToggleButton() {
+            const btn = document.getElementById('help-time-format-toggle-btn');
+            if (btn) {
+                btn.textContent = use24HourTime ? 'Format: 24h (13:30)' : 'Format: 12h (1:30 PM)';
+            }
+        }
+
+        function toggleTimeFormatPreference() {
+            use24HourTime = !use24HourTime;
+            localStorage.setItem('hele_on_use_24h', use24HourTime);
+            updateTimeFormatToggleButton();
+            redrawMapLayers(false);
+            const openPopup = map._popup;
+            if (openPopup && openPopup.isOpen()) {
+                markersLayer.eachLayer(layer => {
+                    if (layer instanceof L.Marker && layer.getPopup() === openPopup) {
+                        layer.openPopup();
+                    }
+                });
+            }
+        }
+
         const vibrantRouteColors = ['#f43f5e', '#38bdf8', '#4ade80', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#84cc16', '#eab308', '#6366f1'];
         let routeColorMap = {};
         let colorIndexCounter = 0;
@@ -857,6 +891,7 @@
             } else {
                 updateCalendarDateDisplay('');
             }
+            updateTimeFormatToggleButton();
 
             addRouteRow('', false);
         }
@@ -1018,14 +1053,18 @@
             return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
         }
 
-        function formatTime12h(timeStr) {
+        function formatTimeDisplay(timeStr) {
             if (!timeStr) return '';
             let parts = timeStr.split(':');
             if (parts.length < 2) return timeStr;
             let h = parseInt(parts[0], 10);
             let m = parts[1];
-            let ampm = h >= 12 && h < 24 ? 'PM' : 'AM';
-            let h12 = h % 12;
+            if (use24HourTime) {
+                let h24 = String(h % 24).padStart(2, '0');
+                return `${h24}:${m}`;
+            }
+            let ampm = (h % 24) >= 12 ? 'PM' : 'AM';
+            let h12 = (h % 24) % 12;
             if (h12 === 0) h12 = 12;
             return `${h12}:${m} ${ampm}`;
         }
@@ -1843,9 +1882,9 @@
                             tripResultsHtml += `
                                 <li class="${isSelected ? 'active-conn-trip' : ''}" data-dep="${vt.depTime}" data-arr="${vt.arrTime}" onclick="selectLegTrip('${rowId}', '${vt.tripId}')" style="border-left-color: ${borderLeftColor};">
                                     <span style="font-family: monospace; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
-                                        <span class="trip-dep-wrap" style="color: ${depColor};">Dep: <span class="dep-time">${vt.depTime}</span></span>
+                                        <span class="trip-dep-wrap" style="color: ${depColor};">Dep: <span class="dep-time">${formatTimeDisplay(vt.depTime)}</span></span>
                                         <span style="color: #64748b;">&rarr;</span>
-                                        <span class="trip-arr-wrap" style="color: ${arrColor};">Arr: <span class="arr-time">${vt.arrTime}</span></span>
+                                        <span class="trip-arr-wrap" style="color: ${arrColor};">Arr: <span class="arr-time">${formatTimeDisplay(vt.arrTime)}</span></span>
                                     </span>
                                     ${isSelected ? `<span style="font-size:0.6rem; color:#38bdf8; font-weight:bold;">${badgeLabel}</span>` : ''}
                                 </li>`;
@@ -1931,9 +1970,9 @@
                             </div>
                             <div class="transfer-times-box">
                                 <div style="display: flex; align-items: center; gap: 6px;">
-                                    <span style="color: ${arrColor};">Arr: <b>${active.arr1}</b></span>
+                                    <span style="color: ${arrColor};">Arr: <b>${formatTimeDisplay(active.arr1)}</b></span>
                                     <span style="color: #64748b;">➔</span>
-                                    <span style="color: ${depColor};">Dep: <b>${active.dep2}</b></span>
+                                    <span style="color: ${depColor};">Dep: <b>${formatTimeDisplay(active.dep2)}</b></span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 4px;">
                                     <span style="color: #94a3b8;">Layover:</span>
@@ -2217,13 +2256,29 @@
             let tripStops = gtfsData.stopTimes[tripId] || [];
             let rawRouteObj = gtfsData.rawRoutes[routeId] || {};
             let rColor = getRouteColor(routeId);
+            let activeRouteRows = getActiveRouteRows();
+            let matchedRow = activeRouteRows.find(r => r.rowId === targetRowId) || activeRouteRows.find(r => r.routeId === routeId);
+            let rDisplayName = getRouteDisplayName(routeId, matchedRow ? matchedRow.instanceNum : null);
+
+            let totalStopsCount = tripStops.length;
+            let durationBadgeHtml = '';
+            if (tripStops.length >= 2) {
+                let firstTime = tripStops[0].dep || tripStops[0].arr;
+                let lastTime = tripStops[tripStops.length - 1].arr || tripStops[tripStops.length - 1].dep;
+                if (firstTime && lastTime) {
+                    let totalTripMins = timeToMins(lastTime) - timeToMins(firstTime);
+                    if (totalTripMins > 0) {
+                        durationBadgeHtml = `<span class="popup-itinerary-badge" title="Total Trip Duration">⏱️ ${formatDuration(totalTripMins)}</span>`;
+                    }
+                }
+            }
 
             let stopsSnippet = tripStops.map(tStop => {
                 let sMeta = gtfsData.stops[tStop.stop_id];
                 let rawName = sMeta ? sMeta.name : 'Unknown Stop';
                 let cleanName = cleanStopName(rawName, rawRouteObj.route_long_name || '');
                 let stopTime24 = tStop.dep || tStop.arr || '';
-                let formattedTime = formatTime12h(stopTime24);
+                let formattedTime = formatTimeDisplay(stopTime24);
                 let isCurrentStop = (tStop.stop_id === currentStopId);
                 let currentLat = sMeta ? sMeta.lat : 0;
                 let currentLng = sMeta ? sMeta.lng : 0;
@@ -2280,7 +2335,16 @@
                     </div>
                 </div>
                 <div class="popup-itinerary-header">
-                    <span class="popup-itinerary-title">${destHeadsign}</span>
+                    <div class="popup-itinerary-title-row" style="border-left: 3px solid ${rColor}; padding-left: 6px;">
+                        <span class="popup-itinerary-title" style="color: ${rColor};" title="${rDisplayName}">${rDisplayName}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 4px; padding-left: 6px;">
+                        <span class="popup-dep-headsign" style="font-weight: bold; color: #38bdf8;" title="${destHeadsign}">${destHeadsign}</span>
+                        <div class="popup-itinerary-badges">
+                            ${durationBadgeHtml}
+                            <span class="popup-itinerary-badge">${totalStopsCount} stops</span>
+                        </div>
+                    </div>
                 </div>
                 <div id="popup-content-view-${currentStopId}" class="popup-scroll-container">
                     <div style="font-size:0.6rem; color:#94a3b8; margin-bottom:4px;">Tap any stop below to view on map:</div>
@@ -2385,7 +2449,7 @@
             let departuresSnippet = '';
             tripEntriesArr.forEach(item => {
                 let destHeadsign = item.headsign ? `➔ To ${item.headsign}` : '';
-                let formattedDepTime = formatTime12h(item.sortTime);
+                let formattedDepTime = formatTimeDisplay(item.sortTime);
                 let isSelectedTrip = (stopSelectedTripId[stopId] === item.tripId);
 
                 departuresSnippet += `
