@@ -489,7 +489,7 @@
                 <h3>Map Zooming & Gestures</h3>
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
                 <p><strong>📍 Long-Press Map Location:</strong> Long-press anywhere on the map to automatically find and display the closest route and its nearby stops relative to that location.</p>
-                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Multi-Route Overlap / Transfer stop). In departure popups, ◀ ▶ steppers cycle through different serving routes. In itinerary popups (📋), ◀ ▶ directional steppers let you cycle through all available trip directions for that route. Tap ◀ to return to departures and ↩ to return to the origin stop if inspecting remote stops.</p>
+                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Half-White / Half-Black = Connecting Transfer stop, Gray = Multi-Route Overlap stop). In departure popups, ◀ ▶ steppers cycle through different serving routes. In itinerary popups (📋), ◀ ▶ directional steppers let you cycle through all available trip directions for that route.</p>
                 <p><strong>🎯 Map Focus & Extent Controls:</strong> When a route's Start or End stops are selected, contextual navigation buttons appear in the popup top action row: tap the <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff" stroke="#0f172a" stroke-width="2" style="vertical-align: middle;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> White Arrow button to center on the Start stop, the <svg width="12" height="12" viewBox="0 0 24 24" fill="#000000" stroke="#ffffff" stroke-width="2" style="vertical-align: middle;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Black Arrow button to center on the End stop, or the ☯ Yin-Yang button to automatically fit and show both Start and End stops together on screen.</p>
             </div>
             <div class="help-section">
@@ -1474,23 +1474,49 @@
                     let routesAtStop = activeStopsMap[stopId];
                     let servingRouteIds = Object.keys(routesAtStop);
 
-                    let markerZIndex = 0;
-                    if (servingRouteIds.length > 1) {
-                        finalIconColor = '#94a3b8'; // Multi-route / Overlap stop
-                        iconStrokeColor = '#0f172a';
-                    }
-                    if (isStartForAny && isEndForAny) {
-                        finalIconColor = '#94a3b8'; // Start & End Overlap Stop
-                        iconStrokeColor = '#0f172a';
-                        markerZIndex = 1000;
+                    let isTransferConnecting = isStartForAny && isEndForAny;
+                    let markerZIndex = 100;
+                    let svgInnerHtml = '';
+
+                    if (isTransferConnecting) {
+                        markerZIndex = 2000; // Float on top of everything
+                        svgInnerHtml = `
+                            <svg width="22" height="22" viewBox="0 0 24 24">
+                                <!-- Left Half: White -->
+                                <polygon points="12,2 12,17 5,21" fill="#ffffff" stroke="#0f172a" stroke-width="1.2" stroke-linejoin="round" />
+                                <!-- Right Half: Black -->
+                                <polygon points="12,2 19,21 12,17" fill="#000000" stroke="#ffffff" stroke-width="1.2" stroke-linejoin="round" />
+                                <!-- Outer Accent Divider & Border -->
+                                <polygon points="12,2 19,21 12,17 5,21" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linejoin="round" />
+                            </svg>
+                        `;
                     } else if (isStartForAny) {
-                        finalIconColor = '#ffffff'; // Start Stop
-                        iconStrokeColor = '#0f172a';
-                        markerZIndex = 1000;
+                        markerZIndex = 1200;
+                        svgInnerHtml = `
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
+                            </svg>
+                        `;
                     } else if (isEndForAny) {
-                        finalIconColor = '#000000'; // End Stop
-                        iconStrokeColor = '#ffffff';
-                        markerZIndex = 1000;
+                        markerZIndex = 1200;
+                        svgInnerHtml = `
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="#000000" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
+                            </svg>
+                        `;
+                    } else if (servingRouteIds.length > 1) {
+                        markerZIndex = 500;
+                        svgInnerHtml = `
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="#94a3b8" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
+                            </svg>
+                        `;
+                    } else {
+                        svgInnerHtml = `
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="${routeColor}" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
+                            </svg>
+                        `;
                     }
 
                     if (stopActiveRouteIndex[stopId] === undefined || stopActiveRouteIndex[stopId] >= servingRouteIds.length) {
@@ -1511,12 +1537,12 @@
                         </div>
                     `;
 
+                    let shadowFilter = isTransferConnecting ? 'drop-shadow(0px 0px 4px rgba(6, 182, 212, 0.95))' : 'drop-shadow(0px 0px 3px rgba(0,0,0,0.8))';
+
                     let svgArrowIcon = L.divIcon({
                         className: 'stop-svg-arrow',
-                        html: `<div style="transform: rotate(${matchInfo.bearing}deg); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0px 0px 3px rgba(0,0,0,0.8));">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="${finalIconColor}" stroke="${iconStrokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
-                            </svg>
+                        html: `<div style="transform: rotate(${matchInfo.bearing}deg); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; filter: ${shadowFilter};">
+                            ${svgInnerHtml}
                         </div>`,
                         iconSize: [24, 24],
                         iconAnchor: [12, 12],
