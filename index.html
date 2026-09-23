@@ -435,10 +435,10 @@
                 <span>Transit Schedule Notice</span>
             </div>
             <p class="disclaimer-text">
-                Schedule timetables, route alignments, and connections are based on published GTFS and PDS schedule data and are subject to change without prior notice.
+                Schedule timetables, route alignments, and connections are compiled from published GTFS and PDS schedule feeds with manual processing.
             </p>
             <p class="disclaimer-text" style="color: #94a3b8; font-size: 0.7rem;">
-                Actual bus arrivals may vary due to weather, traffic, detours, or mechanical delays. Please use this information at your own discretion.
+                While every effort is made to ensure accuracy, inadvertent errors, omissions, or real-time delays due to weather, traffic, and detours may occur. Please verify critical travel plans with official Hele-On Transit bulletins.
             </p>
             <label class="disclaimer-checkbox-row">
                 <input type="checkbox" id="disclaimer-dont-show-cb">
@@ -1482,12 +1482,10 @@
                         markerZIndex = 2000; // Float on top of everything
                         svgInnerHtml = `
                             <svg width="22" height="22" viewBox="0 0 24 24">
-                                <!-- Left Half: White -->
-                                <polygon points="12,2 12,17 5,21" fill="#ffffff" stroke="#0f172a" stroke-width="1.2" stroke-linejoin="round" />
-                                <!-- Right Half: Black -->
-                                <polygon points="12,2 19,21 12,17" fill="#000000" stroke="#ffffff" stroke-width="1.2" stroke-linejoin="round" />
-                                <!-- Outer Accent Divider & Border -->
-                                <polygon points="12,2 19,21 12,17 5,21" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linejoin="round" />
+                                <!-- Left Half: Solid White -->
+                                <polygon points="12,2 12,17 5,21" fill="#ffffff" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round" />
+                                <!-- Right Half: Solid Black -->
+                                <polygon points="12,2 19,21 12,17" fill="#000000" stroke="#000000" stroke-width="1.5" stroke-linejoin="round" />
                             </svg>
                         `;
                     } else if (isStartForAny) {
@@ -1537,7 +1535,7 @@
                         </div>
                     `;
 
-                    let shadowFilter = isTransferConnecting ? 'drop-shadow(0px 0px 4px rgba(6, 182, 212, 0.95))' : 'drop-shadow(0px 0px 3px rgba(0,0,0,0.8))';
+                    let shadowFilter = isTransferConnecting ? 'drop-shadow(0px 0px 4px rgba(0,0,0,0.95))' : 'drop-shadow(0px 0px 3px rgba(0,0,0,0.8))';
 
                     let svgArrowIcon = L.divIcon({
                         className: 'stop-svg-arrow',
