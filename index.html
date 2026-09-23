@@ -442,7 +442,7 @@
                 <h3>Map Zooming & Gestures</h3>
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
                 <p><strong>📍 Long-Press Map Location:</strong> Long-press anywhere on the map to automatically find and display the closest route and its nearby stops relative to that location.</p>
-                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Multi-Route Overlap / Transfer stop). For any stop shared by multiple active routes, ◀ and ▶ steppers appear in the top action row alongside 📍, 🏁, 📋, and 🔍, and tapping the marker on the map directly advances through each serving route in a continuous loop. The route title and departures list scroll both vertically and horizontally so long route and stop names can be read in full. Tap 📋 in the popup to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to origin if inspecting remote stops.</p>
+                <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Multi-Route Overlap / Transfer stop). For any stop shared by multiple active routes, ◀ and ▶ route cycler steppers are embedded directly in the route title banner row, and tapping the marker on the map directly advances through each serving route in a continuous loop. The route title and departures list scroll both vertically and horizontally so long route and stop names can be read in full. Tap 📋 in the popup top action row to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to origin if inspecting remote stops.</p>
                 <p><strong>🎯 Map Focus & Extent Controls:</strong> When a route's Start or End stops are selected, contextual navigation buttons appear in the popup top action row: tap the <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff" stroke="#0f172a" stroke-width="2" style="vertical-align: middle;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> White Arrow button to center on the Start stop, the <svg width="12" height="12" viewBox="0 0 24 24" fill="#000000" stroke="#ffffff" stroke-width="2" style="vertical-align: middle;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Black Arrow button to center on the End stop, or the ☯ Yin-Yang button to automatically fit and show both Start and End stops together on screen.</p>
             </div>
             <div class="help-section">
@@ -2400,15 +2400,12 @@
                 `;
             });
 
-            let cyclerBarHtml = '';
+            let cyclerNavBtns = '';
             if (servingInstances.length > 1) {
-                cyclerBarHtml = `
-                    <div class="popup-route-cycler-bar">
-                        <span class="popup-route-cycler-title" style="color: ${rColor};" title="${rDisplayName}">${rDisplayName} (${curInstanceIdx + 1} of ${servingInstances.length})</span>
-                        <div class="popup-route-stepper-btns">
-                            <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', -1)" title="Previous Route">◀</button>
-                            <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', 1)" title="Next Route">▶</button>
-                        </div>
+                cyclerNavBtns = `
+                    <div style="display: flex; gap: 2px; align-items: center; flex-shrink: 0;">
+                        <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', -1)" title="Previous Route">◀</button>
+                        <button class="btn-action" style="padding: 2px 6px; font-size: 0.6rem;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', 1)" title="Next Route">▶</button>
                     </div>
                 `;
             }
@@ -2416,14 +2413,6 @@
             let returnOriginBtn = (inspectedOriginStop && inspectedOriginStop.stopId !== stopId) ? `
                 <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); returnToOriginStop()" title="Return to origin stop">↩</button>
             ` : '';
-
-            let cyclerNavBtns = '';
-            if (servingInstances.length > 1) {
-                cyclerNavBtns = `
-                    <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', -1)" title="Previous Route">◀</button>
-                    <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); cycleStopRoute('${stopId}', 1)" title="Next Route">▶</button>
-                `;
-            }
 
             let hasTrips = tripEntriesArr.length > 0;
             let rowParam = targetRowId ? `'${targetRowId}'` : 'null';
@@ -2459,14 +2448,16 @@
                         ${returnOriginBtn}
                     </div>
                     <div style="display: flex; gap: 3px; align-items: center;">
-                        ${cyclerNavBtns}
                         <button class="btn-action" style="padding: 3px 8px;" onclick="event.stopPropagation(); showPopupItinerary('${stopId}', '${activeRouteId}', '${stopSelectedTripId[stopId] || ''}', ${rowParam})" title="View Itinerary" ${hasTrips ? '' : 'disabled style="opacity:0.4;"'}>📋</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="openNextClosestRouteForStop('${stopId}')" title="Find Next Route Serving Stop">🔍</button>
                     </div>
                 </div>
+                <div class="popup-route-title-banner" style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; border-left: 3px solid ${rColor}; padding-left: 6px;">
+                    <span class="popup-times-title" style="color: ${rColor}; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-bottom: 0;" title="${rDisplayName}">${rDisplayName}</span>
+                    ${cyclerNavBtns}
+                </div>
                 <div id="popup-content-view-${stopId}" class="popup-scroll-container">
-                    <div class="popup-route-section" style="border-left: 3px solid ${rColor}; padding-left: 6px;">
-                        <span class="popup-times-title" style="color: ${rColor};">${rDisplayName}</span>
+                    <div class="popup-route-section" style="padding-left: 6px;">
                         <div class="popup-departures-list">
                             ${departuresSnippet}
                         </div>
