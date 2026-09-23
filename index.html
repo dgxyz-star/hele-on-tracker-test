@@ -443,6 +443,7 @@
                 <p><strong>👆 Double-Tap & Drag Zoom:</strong> Double-tap with your finger and hold on the second tap, then slide down to zoom in or slide up to zoom out of the map smoothly.</p>
                 <p><strong>📍 Long-Press Map Location:</strong> Long-press anywhere on the map to automatically find and display the closest route and its nearby stops relative to that location.</p>
                 <p><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="#4ade80" stroke="#0f172a" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stop Markers & Directional Arrows:</strong> Directional arrowhead markers indicate the bus travel direction (White = Start stop, Black = End stop, Gray = Multi-Route Overlap / Transfer stop). For any stop shared by multiple active routes, ◀ and ▶ steppers appear in the top action row alongside 📍, 🏁, 📋, and 🔍, and tapping the marker on the map directly advances through each serving route in a continuous loop. The route title and departures list scroll both vertically and horizontally so long route and stop names can be read in full. Tap 📋 in the popup to toggle full trip itineraries, ◀ to return to departures, and ↩ to return to origin if inspecting remote stops.</p>
+                <p><strong>🎯 Map Focus & Extent Controls:</strong> When a route's Start or End stops are selected, contextual navigation buttons appear in the popup top action row: tap the <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff" stroke="#0f172a" stroke-width="2" style="vertical-align: middle;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> White Arrow button to center on the Start stop, the <svg width="12" height="12" viewBox="0 0 24 24" fill="#000000" stroke="#ffffff" stroke-width="2" style="vertical-align: middle;"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Black Arrow button to center on the End stop, or the ☯ Yin-Yang button to automatically fit and show both Start and End stops together on screen.</p>
             </div>
             <div class="help-section">
                 <h3>Top Control Bar & Floating Menu</h3>
@@ -2158,6 +2159,43 @@
             }
         });
 
+        function focusPlannerStop(routeId, type, specificRowId = null) {
+            const activeRows = getActiveRouteRows();
+            let targetRowId = specificRowId;
+            if (!targetRowId) {
+                let matching = activeRows.filter(r => r.routeId === routeId);
+                let configured = matching.find(r => routePlanners[r.rowId] && (type === 'start' ? routePlanners[r.rowId].startStopId : routePlanners[r.rowId].endStopId));
+                targetRowId = configured ? configured.rowId : (matching.length > 0 ? matching[0].rowId : null);
+            }
+            if (!targetRowId || !routePlanners[targetRowId]) return;
+            let stopId = (type === 'start') ? routePlanners[targetRowId].startStopId : routePlanners[targetRowId].endStopId;
+            if (!stopId) return;
+            let stopInfo = gtfsData.stops[stopId];
+            if (stopInfo && !isNaN(stopInfo.lat) && !isNaN(stopInfo.lng)) {
+                map.setView([stopInfo.lat, stopInfo.lng], 15);
+            }
+        }
+
+        function fitPlannerBounds(routeId, specificRowId = null) {
+            const activeRows = getActiveRouteRows();
+            let targetRowId = specificRowId;
+            if (!targetRowId) {
+                let matching = activeRows.filter(r => r.routeId === routeId);
+                let configured = matching.find(r => routePlanners[r.rowId] && routePlanners[r.rowId].startStopId && routePlanners[r.rowId].endStopId);
+                targetRowId = configured ? configured.rowId : (matching.length > 0 ? matching[0].rowId : null);
+            }
+            if (!targetRowId || !routePlanners[targetRowId]) return;
+            let startStopId = routePlanners[targetRowId].startStopId;
+            let endStopId = routePlanners[targetRowId].endStopId;
+            if (!startStopId || !endStopId) return;
+            let sStart = gtfsData.stops[startStopId];
+            let sEnd = gtfsData.stops[endStopId];
+            if (sStart && sEnd && !isNaN(sStart.lat) && !isNaN(sEnd.lat)) {
+                let bounds = L.latLngBounds([[sStart.lat, sStart.lng], [sEnd.lat, sEnd.lng]]);
+                map.fitBounds(bounds, { padding: [60, 60] });
+            }
+        }
+
         function showPopupItinerary(currentStopId, routeId, tripId, targetRowId = null) {
             const mainBody = document.getElementById(`popup-main-body-${currentStopId}`);
             if (!mainBody) return;
@@ -2206,11 +2244,34 @@
 
             let rowParam = targetRowId ? `'${targetRowId}'` : 'null';
 
+            let curPlanner = targetRowId ? routePlanners[targetRowId] : null;
+            if (!curPlanner) {
+                const activeRows = getActiveRouteRows();
+                let matching = activeRows.filter(r => r.routeId === routeId);
+                let matchWithStops = matching.find(r => routePlanners[r.rowId] && (routePlanners[r.rowId].startStopId || routePlanners[r.rowId].endStopId));
+                curPlanner = matchWithStops ? routePlanners[matchWithStops.rowId] : (matching.length > 0 ? routePlanners[matching[0].rowId] : null);
+            }
+
+            let startFocusBtn = (curPlanner && curPlanner.startStopId) ? `
+                <button class="btn-action" style="padding: 3px 6px;" onclick="event.stopPropagation(); focusPlannerStop('${routeId}', 'start', ${rowParam})" title="Focus Start Stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="#ffffff" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg></button>
+            ` : '';
+
+            let endFocusBtn = (curPlanner && curPlanner.endStopId) ? `
+                <button class="btn-action" style="padding: 3px 6px;" onclick="event.stopPropagation(); focusPlannerStop('${routeId}', 'end', ${rowParam})" title="Focus End Stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="#000000" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg></button>
+            ` : '';
+
+            let fitBothBtn = (curPlanner && curPlanner.startStopId && curPlanner.endStopId) ? `
+                <button class="btn-action" style="padding: 3px 6px;" onclick="event.stopPropagation(); fitPlannerBounds('${routeId}', ${rowParam})" title="Fit Start & End on Map"><svg width="14" height="14" viewBox="0 0 24 24" stroke="#0f172a" stroke-width="1.5"><circle cx="12" cy="12" r="10" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/><path d="M12 2a10 10 0 0 1 0 20 5 5 0 0 1 0-10 5 5 0 0 0 0-10z" fill="#ffffff"/><circle cx="12" cy="7" r="1.5" fill="#0f172a"/><circle cx="12" cy="17" r="1.5" fill="#ffffff"/></svg></button>
+            ` : '';
+
             mainBody.innerHTML = `
                 <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <div style="display: flex; gap: 3px; align-items: center;">
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'start', ${rowParam})">📍</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${routeId}', '${currentStopId}', 'end', ${rowParam})">🏁</button>
+                        ${startFocusBtn}
+                        ${endFocusBtn}
+                        ${fitBothBtn}
                         ${returnOriginBtn}
                     </div>
                     <div style="display: flex; gap: 3px; align-items: center;">
@@ -2367,11 +2428,34 @@
             let hasTrips = tripEntriesArr.length > 0;
             let rowParam = targetRowId ? `'${targetRowId}'` : 'null';
 
+            let curPlanner = targetRowId ? routePlanners[targetRowId] : null;
+            if (!curPlanner) {
+                const activeRows = getActiveRouteRows();
+                let matching = activeRows.filter(r => r.routeId === activeRouteId);
+                let matchWithStops = matching.find(r => routePlanners[r.rowId] && (routePlanners[r.rowId].startStopId || routePlanners[r.rowId].endStopId));
+                curPlanner = matchWithStops ? routePlanners[matchWithStops.rowId] : (matching.length > 0 ? routePlanners[matching[0].rowId] : null);
+            }
+
+            let startFocusBtn = (curPlanner && curPlanner.startStopId) ? `
+                <button class="btn-action" style="padding: 3px 6px;" onclick="event.stopPropagation(); focusPlannerStop('${activeRouteId}', 'start', ${rowParam})" title="Focus Start Stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="#ffffff" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg></button>
+            ` : '';
+
+            let endFocusBtn = (curPlanner && curPlanner.endStopId) ? `
+                <button class="btn-action" style="padding: 3px 6px;" onclick="event.stopPropagation(); focusPlannerStop('${activeRouteId}', 'end', ${rowParam})" title="Focus End Stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="#000000" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg></button>
+            ` : '';
+
+            let fitBothBtn = (curPlanner && curPlanner.startStopId && curPlanner.endStopId) ? `
+                <button class="btn-action" style="padding: 3px 6px;" onclick="event.stopPropagation(); fitPlannerBounds('${activeRouteId}', ${rowParam})" title="Fit Start & End on Map"><svg width="14" height="14" viewBox="0 0 24 24" stroke="#0f172a" stroke-width="1.5"><circle cx="12" cy="12" r="10" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/><path d="M12 2a10 10 0 0 1 0 20 5 5 0 0 1 0-10 5 5 0 0 0 0-10z" fill="#ffffff"/><circle cx="12" cy="7" r="1.5" fill="#0f172a"/><circle cx="12" cy="17" r="1.5" fill="#ffffff"/></svg></button>
+            ` : '';
+
             return `
                 <div class="popup-actions-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <div style="display: flex; gap: 3px; align-items: center;">
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'start', ${rowParam})">📍</button>
                         <button class="btn-action" style="padding: 3px 8px;" onclick="setRoutePlannerStop('${activeRouteId}', '${stopId}', 'end', ${rowParam})">🏁</button>
+                        ${startFocusBtn}
+                        ${endFocusBtn}
+                        ${fitBothBtn}
                         ${returnOriginBtn}
                     </div>
                     <div style="display: flex; gap: 3px; align-items: center;">
