@@ -131,6 +131,15 @@
         .help-section p, .help-section li { font-size: 0.75rem; color: #cbd5e1; line-height: 1.4; margin-bottom: 4px; word-break: break-word; overflow-wrap: break-word; }
         .help-section ul { padding-left: 16px; }
 
+        /* Disclaimer Modal Overlay */
+        #disclaimer-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(15, 23, 42, 0.88); z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 16px; transition: opacity 0.2s ease; }
+        #disclaimer-overlay.hidden { display: none; }
+        .disclaimer-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 18px; max-width: 320px; width: 100%; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 24px rgba(0,0,0,0.8); }
+        .disclaimer-header { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: bold; color: #f59e0b; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+        .disclaimer-text { font-size: 0.75rem; color: #cbd5e1; line-height: 1.45; }
+        .disclaimer-checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: #94a3b8; cursor: pointer; user-select: none; margin-top: 2px; }
+        .disclaimer-checkbox-row input { cursor: pointer; accent-color: #06b6d4; width: 14px; height: 14px; }
+
         /* QR Code Modal Overlay */
         #qr-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(15, 23, 42, 0.85); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 12px; transition: opacity 0.2s ease; }
         #qr-overlay.hidden { display: none; }
@@ -418,6 +427,27 @@
         <div id="route-panels-container"></div>
     </div>
 
+    <!-- First-Time Launch Disclaimer Modal Overlay -->
+    <div id="disclaimer-overlay" class="hidden">
+        <div class="disclaimer-card">
+            <div class="disclaimer-header">
+                <span>⚠️</span>
+                <span>Transit Schedule Notice</span>
+            </div>
+            <p class="disclaimer-text">
+                Schedule timetables, route alignments, and connections are based on published GTFS data and are subject to change without prior notice.
+            </p>
+            <p class="disclaimer-text" style="color: #94a3b8; font-size: 0.7rem;">
+                Actual bus arrivals may vary due to weather, traffic, detours, or mechanical delays. Please use this information at your own discretion.
+            </p>
+            <label class="disclaimer-checkbox-row">
+                <input type="checkbox" id="disclaimer-dont-show-cb">
+                <span>Don't show this notice again</span>
+            </label>
+            <button class="btn-action" style="width: 100%; padding: 7px; justify-content: center; font-size: 0.75rem; margin-top: 4px;" onclick="dismissDisclaimer()">I Understand & Continue</button>
+        </div>
+    </div>
+
     <!-- QR Code Share Modal Overlay -->
     <div id="qr-overlay" class="hidden">
         <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; max-width: 300px; width: 100%; display: flex; flex-direction: column; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.7);">
@@ -526,6 +556,23 @@
             }).catch(err => {
                 console.error("Failed to copy email:", err);
             });
+        }
+
+        function checkDisclaimerOnLoad() {
+            const hideDisclaimer = localStorage.getItem('hele_on_hide_disclaimer') === 'true';
+            if (!hideDisclaimer) {
+                const overlay = document.getElementById('disclaimer-overlay');
+                if (overlay) overlay.classList.remove('hidden');
+            }
+        }
+
+        function dismissDisclaimer() {
+            const dontShow = document.getElementById('disclaimer-dont-show-cb');
+            if (dontShow && dontShow.checked) {
+                localStorage.setItem('hele_on_hide_disclaimer', 'true');
+            }
+            const overlay = document.getElementById('disclaimer-overlay');
+            if (overlay) overlay.classList.add('hidden');
         }
 
         function updateCalendarDateDisplay(dateStr) {
@@ -2828,7 +2875,8 @@
             findNearestRouteToLatLng([e.latlng.lat, e.latlng.lng]);
         });
 
-        // Initialize geolocation and load transit feed
+        // Check first-time disclaimer, initialize geolocation and load transit feed
+        checkDisclaimerOnLoad();
         initLiveGeolocation();
         loadGTFSData();
     </script>
