@@ -345,28 +345,32 @@
         .popup-header-row { margin-bottom: 6px; width: 100%; box-sizing: border-box; }
         .popup-stop-name { font-weight: bold; color: #06b6d4; font-size: 0.8rem; display: block; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .popup-stop-meta { font-size: 0.65rem; color: #94a3b8; margin-top: 1px; margin-bottom: 4px; }
-        .popup-scroll-container { max-height: 240px; overflow-y: auto; overflow-x: hidden; margin-top: 4px; padding-right: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; width: 100%; box-sizing: border-box; }
+        .popup-scroll-container { max-height: 240px; overflow-y: auto; overflow-x: auto; margin-top: 4px; padding-right: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; width: 100%; box-sizing: border-box; }
         .popup-scroll-container::-webkit-scrollbar { display: none; width: 0; height: 0; }
-        .popup-route-section { margin-bottom: 4px; width: 100%; box-sizing: border-box; }
+        .popup-route-section { margin-bottom: 4px; min-width: 100%; width: max-content; box-sizing: border-box; }
 
-        .popup-route-title-banner { width: 100%; box-sizing: border-box; }
-        .popup-times-title { font-size: 0.68rem; font-weight: bold; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; flex: 1; min-width: 0; }
-        .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; width: 100%; box-sizing: border-box; }
-        .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; align-items: center; width: 100%; box-sizing: border-box; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+        .popup-route-title-banner { width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .popup-times-title { font-size: 0.68rem; font-weight: bold; margin-bottom: 4px; white-space: nowrap; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; display: block; flex: 1; min-width: 0; }
+        .popup-times-title::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+        .popup-departures-list { list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; min-width: 100%; width: max-content; box-sizing: border-box; }
+        .popup-departure-card { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; display: flex; align-items: center; min-width: 100%; width: max-content; box-sizing: border-box; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
         .popup-departure-card:hover { background: #1e293b; border-color: #475569; }
         .popup-departure-card.active-selected-trip { background: rgba(6, 182, 212, 0.12); border-color: #06b6d4; }
-        .popup-dep-main-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; }
-        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
-        .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+        .popup-dep-main-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; white-space: nowrap; }
+        .popup-dep-time-headsign { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .popup-dep-headsign { font-size: 0.68rem; color: #cbd5e1; white-space: nowrap; }
 
         .popup-itinerary-header { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 3px; width: 100%; box-sizing: border-box; }
         .popup-itinerary-title-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; box-sizing: border-box; }
-        .popup-itinerary-title { font-size: 0.7rem; font-weight: bold; color: #38bdf8; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-        .popup-times-list { list-style-type: none; padding-left: 0; width: 100%; box-sizing: border-box; }
-        .popup-times-list li { background: #0f172a; padding: 5px 8px; margin-bottom: 3px; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s; width: 100%; box-sizing: border-box; overflow: hidden; }
+        .popup-itinerary-title { font-size: 0.7rem; font-weight: bold; color: #38bdf8; display: block; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; white-space: nowrap; flex: 1; min-width: 0; }
+        .popup-itinerary-title::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+        .popup-times-list { list-style-type: none; padding-left: 0; min-width: 100%; width: max-content; box-sizing: border-box; }
+        .popup-times-list li { background: #0f172a; padding: 5px 8px; margin-bottom: 3px; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s; min-width: 100%; width: max-content; box-sizing: border-box; white-space: nowrap; }
         .popup-times-list li:hover { background: #334155; }
         .popup-times-list li.current-active-stop { background: rgba(56, 189, 248, 0.2); border-left: 3px solid #38bdf8; font-weight: bold; }
-        .stop-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+        .stop-name-text { white-space: nowrap; flex-shrink: 0; }
         .time-group { font-family: monospace; font-weight: bold; flex-shrink: 0; }
 
         .user-loc-dot { background: #06b6d4; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 0 6px rgba(6, 182, 212, 0.8); }
