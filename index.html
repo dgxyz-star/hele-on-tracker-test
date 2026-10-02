@@ -95,32 +95,6 @@
         .floating-toggle-container { position: absolute; top: 6px; right: 8px; z-index: 1001; display: none; gap: 4px; }
         body.header-is-collapsed .floating-toggle-container { display: flex; }
 
-        .floating-drawer-toggle-btn {
-            position: absolute;
-            bottom: 12px;
-            right: 12px;
-            z-index: 1002;
-            background: #1e293b;
-            color: #06b6d4;
-            border: 1px solid #475569;
-            border-radius: 4px;
-            padding: 0;
-            width: 36px;
-            height: 31px;
-            box-sizing: border-box;
-            font-size: 0.85rem;
-            font-weight: bold;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.6);
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-            flex-shrink: 0;
-            transition: transform 0.2s ease, background 0.15s;
-        }
-        .floating-drawer-toggle-btn:active { background: #334155; }
-
         .floating-left-container .calendar-btn-wrapper,
         .floating-left-container .action-top-btn,
         .floating-toggle-container .floating-btn {
@@ -196,10 +170,6 @@
 
         #route-panels-container.all-collapsed {
             justify-content: flex-end;
-        }
-
-        #route-panels-container.master-hidden {
-            display: none !important;
         }
 
         .route-panel-card {
@@ -457,8 +427,6 @@
 
     <div id="map-container-wrapper">
         <div id="map"></div>
-        <!-- Master Bottom Drawer Collapse / Expand Toggle Button -->
-        <button id="master-drawer-toggle-btn" class="floating-drawer-toggle-btn" onclick="toggleMasterDrawer()" title="Toggle Schedule Drawer">▼</button>
         <!-- Bottom Per-Route Panels Container with Interspersed Connection Summaries -->
         <div id="route-panels-container"></div>
     </div>
@@ -544,13 +512,12 @@
                 <p>When you select a route from the top dropdown, it displays cleanly on the map without cluttering your screen with extra panels.</p>
                 <ul>
                     <li><strong>Setting Start/End Stops:</strong> Tap any bus stop marker on the map and click the 📍 (Start) or 🏁 (End) buttons. Doing so automatically opens that route's bottom trip planner card.</li>
-                    <li><strong>🔀 Continuous Transfer Layover & Travel Telemetry:</strong> Connecting transfer banners persist between active sequential routes and compute complete layover wait times, transfer walk distances, total stops traversed, and route travel times across all selected legs.</li>
-                    <li><strong>▼ / ▲ Master Drawer Toggle Button:</strong> Tap the floating bottom-right icon button to instantly collapse or expand the entire schedule drawer (all route cards and transfer summaries) at once to maximize map visibility while keeping all trip selections active.</li>
+                    <li><strong>🔀 Automatic Transfer / Layover Summary Bar:</strong> When you set up multiple sequential routes that connect at a common transfer stop, a compact yellow summary bar is automatically inserted directly between the route cards. It displays the shared transfer stop name, Route 1 arrival time, Route 2 departure time, and calculated layover/wait duration. You can browse through connection pairs with the ◀ ▶ buttons or tap specific trips.</li>
                     <li><strong>🔍 Find Sequential Closest Routes:</strong> Tap the magnifying glass icon inside any stop marker's popup to display routes serving that stop. When you press it multiple times, it will initially display the next closest route to that stop and then sequential closest routes.</li>
                     <li><strong>Dual Selection Methods:</strong> Once a route card is open, you can either continue using the map popups or use the dropdown selectors inside the card to fine-tune your start and end stops.</li>
                     <li><strong>Dynamic Equal-Share Space & Scrolling:</strong> Multiple active route cards automatically resize to share available vertical screen space equally. Each card is independently scrollable so you can easily thumb through all matching scheduled trips.</li>
                     <li><strong>Dynamic Time-Based Status:</strong> Scheduled departure and arrival times inside route planner cards are dynamically color-coded based on the current local time: upcoming trips appear in green, while past or missed trips appear in red.</li>
-                    <li><strong>Clearing & Collapsing:</strong> Use the "Clear" button on the card to reset your selections and hide the panel, or tap the card header to collapse/expand individual cards independently.</li>
+                    <li><strong>Clearing & Collapsing:</strong> Use the "Clear" button on the card to reset your selections and hide the panel, or tap the card header to collapse/expand it.</li>
                     <li><strong>Bi-Directional Multi-Leg Propagation:</strong> Selecting any trip on an upstream, middle, or downstream route automatically synchronizes and updates the entire journey timeline in both directions across 3 or more routes. Downstream trips offer full flexibility for extended layovers, while preceding legs adjust backward to guarantee on-time connecting arrivals.</li>
                 </ul>
             </div>
@@ -758,7 +725,6 @@
 
         let gtfsData = { routes: {}, rawRoutes: {}, trips: {}, stops: {}, stopTimes: {}, shapes: {}, calendar: {}, calendarDates: {} };
         let routePlanners = {}; // rowId -> { routeId, startStopId, endStopId, isCollapsed, selectedTripId }
-        let isMasterDrawerCollapsed = false;
         let rowIdCounter = 0;
         let stopActiveRouteIndex = {}; // stopId -> active index in serving route instances
         let stopSelectedTripId = {}; // stopId -> tripId
@@ -1616,39 +1582,22 @@
         // Helper to retrieve valid trip segments for a given planner row instance and date
         function getValidTripsForPlannerRow(rowId, targetDate) {
             let planner = routePlanners[rowId];
-            if (!planner || !planner.routeId) return [];
+            if (!planner || !planner.routeId || !planner.startStopId || !planner.endStopId) return [];
 
             let validTrips = [];
             Object.keys(gtfsData.trips).forEach(tripId => {
                 let trip = gtfsData.trips[tripId];
                 if (trip.route_id === planner.routeId && isServiceActive(trip.service_id, targetDate)) {
                     let stops = gtfsData.stopTimes[tripId] || [];
-                    if (stops.length === 0) return;
-
-                    let startIndex = 0;
-                    let endIndex = stops.length - 1;
-
-                    if (planner.startStopId && planner.endStopId) {
-                        startIndex = -1;
-                        endIndex = -1;
-                        for (let i = 0; i < stops.length; i++) {
-                            if (stops[i].stop_id === planner.startStopId) startIndex = i;
-                            if (stops[i].stop_id === planner.endStopId) endIndex = i;
-                        }
-                    } else if (planner.startStopId) {
-                        startIndex = stops.findIndex(s => s.stop_id === planner.startStopId);
-                        endIndex = stops.length - 1;
-                    } else if (planner.endStopId) {
-                        startIndex = 0;
-                        endIndex = stops.findIndex(s => s.stop_id === planner.endStopId);
+                    let startIndex = -1, endIndex = -1;
+                    for (let i = 0; i < stops.length; i++) {
+                        if (stops[i].stop_id === planner.startStopId) startIndex = i;
+                        if (stops[i].stop_id === planner.endStopId) endIndex = i;
                     }
-
                     if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
                         let depTime = stops[startIndex].dep || stops[startIndex].arr;
                         let arrTime = stops[endIndex].arr || stops[endIndex].dep;
-                        let numStops = endIndex - startIndex;
-                        let durMins = timeToMins(arrTime) - timeToMins(depTime);
-                        validTrips.push({ tripId, depTime, arrTime, numStops, durMins });
+                        validTrips.push({ tripId, depTime, arrTime });
                     }
                 }
             });
@@ -1848,34 +1797,14 @@
             renderRoutePanels(activeRouteRows);
         }
 
-        function toggleMasterDrawer() {
-            isMasterDrawerCollapsed = !isMasterDrawerCollapsed;
-            const container = document.getElementById('route-panels-container');
-            const toggleBtn = document.getElementById('master-drawer-toggle-btn');
-            if (container && toggleBtn) {
-                if (isMasterDrawerCollapsed) {
-                    container.classList.add('master-hidden');
-                    toggleBtn.innerHTML = '▲';
-                    toggleBtn.title = 'Open Schedule Drawer';
-                } else {
-                    container.classList.remove('master-hidden');
-                    toggleBtn.innerHTML = '▼';
-                    toggleBtn.title = 'Collapse Schedule Drawer';
-                }
-            }
-            setTimeout(() => { map.invalidateSize(); }, 300);
-        }
-
         // --- Per-Route Panels & Generalized Interspersed Connection Summary Bars ---
         function renderRoutePanels(activeRouteRows) {
             const container = document.getElementById('route-panels-container');
-            const masterToggleBtn = document.getElementById('master-drawer-toggle-btn');
             if (!container) return;
             container.innerHTML = '';
 
             if (!activeRouteRows || activeRouteRows.length === 0) {
                 container.style.display = 'none';
-                if (masterToggleBtn) masterToggleBtn.style.display = 'none';
                 return;
             }
 
@@ -1887,22 +1816,10 @@
 
             if (activePlannerRows.length === 0) {
                 container.style.display = 'none';
-                if (masterToggleBtn) masterToggleBtn.style.display = 'none';
                 return;
             }
 
             container.style.display = 'flex';
-            if (masterToggleBtn) {
-                masterToggleBtn.style.display = 'inline-flex';
-                masterToggleBtn.innerHTML = isMasterDrawerCollapsed ? '▲' : '▼';
-                masterToggleBtn.title = isMasterDrawerCollapsed ? 'Open Schedule Drawer' : 'Collapse Schedule Drawer';
-            }
-
-            if (isMasterDrawerCollapsed) {
-                container.classList.add('master-hidden');
-            } else {
-                container.classList.remove('master-hidden');
-            }
 
             let allCollapsed = activePlannerRows.every(item => routePlanners[item.rowId]?.isCollapsed);
             if (allCollapsed) {
@@ -1936,67 +1853,51 @@
                 propagateJourneyTimeline(activePlannerRows, 0);
             }
 
-            // Pre-calculate transfer info and pairs between all adjacent leg pairs with persistent telemetry
+            // Pre-calculate transfer info and pairs between all adjacent leg pairs
             let transfersData = [];
             for (let i = 0; i < activePlannerRows.length - 1; i++) {
                 let row1 = activePlannerRows[i].rowId;
                 let row2 = activePlannerRows[i + 1].rowId;
                 let p1 = routePlanners[row1];
                 let p2 = routePlanners[row2];
-                let r1Id = p1?.routeId;
-                let r2Id = p2?.routeId;
 
-                let stopFrom = p1?.endStopId || p1?.startStopId;
-                let stopTo = p2?.startStopId || p2?.endStopId;
+                if (p1?.endStopId && p2?.startStopId) {
+                    let transferInfo = getTransferStopInfo(p1.endStopId, p2.startStopId);
+                    if (transferInfo) {
+                        let trips1 = rowValidTripsMap[row1] || [];
+                        let trips2 = rowValidTripsMap[row2] || [];
+                        let pairs = getAllTransferPairs(trips1, trips2, transferInfo.walkDist);
 
-                let transferInfo = getTransferStopInfo(stopFrom, stopTo);
-                if (!transferInfo && stopFrom && stopTo) {
-                    let s1 = gtfsData.stops[stopFrom];
-                    let s2 = gtfsData.stops[stopTo];
-                    if (s1 && s2) {
-                        let dist = Math.round(getDistanceMeters(s1.lat, s1.lng, s2.lat, s2.lng));
-                        transferInfo = {
-                            isTransfer: true,
-                            name: (stopFrom === stopTo) ? cleanStopName(s1.name) : `${cleanStopName(s1.name)} ➔ ${cleanStopName(s2.name)}`,
-                            walkDist: dist
-                        };
-                    }
-                }
+                        let sel1 = p1.selectedTripId;
+                        let sel2 = p2.selectedTripId;
+                        let curPairIdx = pairs.findIndex(p => p.t1.tripId === sel1 && p.t2.tripId === sel2);
 
-                if (transferInfo) {
-                    let trips1 = rowValidTripsMap[row1] || [];
-                    let trips2 = rowValidTripsMap[row2] || [];
-                    let pairs = getAllTransferPairs(trips1, trips2, transferInfo.walkDist);
-
-                    let sel1 = p1.selectedTripId;
-                    let sel2 = p2.selectedTripId;
-                    let curPairIdx = pairs.findIndex(p => p.t1.tripId === sel1 && p.t2.tripId === sel2);
-
-                    let activePair = null;
-                    if (curPairIdx !== -1) {
-                        activePair = pairs[curPairIdx];
-                    } else {
-                        let t1 = trips1.find(t => t.tripId === sel1) || (trips1.length > 0 ? trips1[0] : null);
-                        let t2 = trips2.find(t => t.tripId === sel2) || (trips2.length > 0 ? trips2[0] : null);
-                        if (t1 && t2) {
-                            activePair = {
-                                t1,
-                                t2,
-                                arr1: t1.arrTime,
-                                dep2: t2.depTime,
-                                waitMins: timeToMins(t2.depTime) - timeToMins(t1.arrTime)
-                            };
+                        let activePair = null;
+                        if (curPairIdx !== -1) {
+                            activePair = pairs[curPairIdx];
+                        } else {
+                            let t1 = trips1.find(t => t.tripId === sel1);
+                            let t2 = trips2.find(t => t.tripId === sel2);
+                            if (t1 && t2) {
+                                activePair = {
+                                    t1,
+                                    t2,
+                                    arr1: t1.arrTime,
+                                    dep2: t2.depTime,
+                                    waitMins: timeToMins(t2.depTime) - timeToMins(t1.arrTime)
+                                };
+                            }
                         }
-                    }
 
-                    transfersData[i] = {
-                        transferInfo,
-                        pairs,
-                        curPairIdx,
-                        activePair,
-                        trips1,
-                        trips2
-                    };
+                        transfersData[i] = {
+                            transferInfo,
+                            pairs,
+                            curPairIdx,
+                            activePair
+                        };
+                    } else {
+                        transfersData[i] = null;
+                    }
                 } else {
                     transfersData[i] = null;
                 }
@@ -2060,28 +1961,28 @@
                 let tripResultsHtml = '';
                 let hasAdjacentTransfer = Boolean(transfersData[idx] || (idx > 0 && transfersData[idx - 1]));
 
-                if (validTrips.length > 0) {
-                    validTrips.forEach(vt => {
-                        let depColor = getTimeColor(vt.depTime, targetDate);
-                        let arrColor = getTimeColor(vt.arrTime, targetDate);
-                        let borderLeftColor = (arrColor === '#ff4d4d') ? '#ff4d4d' : ((depColor === '#ff4d4d') ? '#f59e0b' : '#4ade80');
-                        let isSelected = (planner.selectedTripId === vt.tripId);
-                        let badgeLabel = hasAdjacentTransfer ? 'TRANSFER' : 'SELECTED';
-                        let stopsMetaSnippet = vt.numStops ? `<span style="font-size:0.62rem; color:#94a3b8;">(${vt.numStops} stops · ${formatDuration(vt.durMins)})</span>` : '';
+                if (planner.startStopId && planner.endStopId) {
+                    if (validTrips.length > 0) {
+                        validTrips.forEach(vt => {
+                            let depColor = getTimeColor(vt.depTime, targetDate);
+                            let arrColor = getTimeColor(vt.arrTime, targetDate);
+                            let borderLeftColor = (arrColor === '#ff4d4d') ? '#ff4d4d' : ((depColor === '#ff4d4d') ? '#f59e0b' : '#4ade80');
+                            let isSelected = (planner.selectedTripId === vt.tripId);
+                            let badgeLabel = hasAdjacentTransfer ? 'TRANSFER' : 'SELECTED';
 
-                        tripResultsHtml += `
-                            <li class="${isSelected ? 'active-conn-trip' : ''}" data-dep="${vt.depTime}" data-arr="${vt.arrTime}" onclick="selectLegTrip('${rowId}', '${vt.tripId}')" style="border-left-color: ${borderLeftColor};">
-                                <span style="font-family: monospace; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
-                                    <span class="trip-dep-wrap" style="color: ${depColor};">Dep: <span class="dep-time">${formatTimeDisplay(vt.depTime)}</span></span>
-                                    <span style="color: #64748b;">&rarr;</span>
-                                    <span class="trip-arr-wrap" style="color: ${arrColor};">Arr: <span class="arr-time">${formatTimeDisplay(vt.arrTime)}</span></span>
-                                    ${stopsMetaSnippet}
-                                </span>
-                                ${isSelected ? `<span style="font-size:0.6rem; color:#38bdf8; font-weight:bold;">${badgeLabel}</span>` : ''}
-                            </li>`;
-                    });
-                } else if (planner.startStopId && planner.endStopId) {
-                    tripResultsHtml = `<li style="justify-content:center; color:#f43f5e; border-left-color:#f43f5e; cursor:default;">No direct trips found between selected stops.</li>`;
+                            tripResultsHtml += `
+                                <li class="${isSelected ? 'active-conn-trip' : ''}" data-dep="${vt.depTime}" data-arr="${vt.arrTime}" onclick="selectLegTrip('${rowId}', '${vt.tripId}')" style="border-left-color: ${borderLeftColor};">
+                                    <span style="font-family: monospace; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
+                                        <span class="trip-dep-wrap" style="color: ${depColor};">Dep: <span class="dep-time">${formatTimeDisplay(vt.depTime)}</span></span>
+                                        <span style="color: #64748b;">&rarr;</span>
+                                        <span class="trip-arr-wrap" style="color: ${arrColor};">Arr: <span class="arr-time">${formatTimeDisplay(vt.arrTime)}</span></span>
+                                    </span>
+                                    ${isSelected ? `<span style="font-size:0.6rem; color:#38bdf8; font-weight:bold;">${badgeLabel}</span>` : ''}
+                                </li>`;
+                        });
+                    } else {
+                        tripResultsHtml = `<li style="justify-content:center; color:#f43f5e; border-left-color:#f43f5e; cursor:default;">No direct trips found between selected stops.</li>`;
+                    }
                 } else {
                     tripResultsHtml = `<li style="justify-content:center; color:#94a3b8; border-left-color:#64748b; cursor:default;">Select start and end stops above.</li>`;
                 }
@@ -2178,9 +2079,8 @@
                                     <span>${stopTitle}</span>
                                 </span>
                             </div>
-                            <div class="transfer-times-box" style="justify-content: space-between; align-items: center; color: #f59e0b; font-size: 0.68rem;">
-                                <span>No exact connecting schedule pair found.</span>
-                                <span style="color: #94a3b8; font-size: 0.62rem;">Check individual route departure times above/below.</span>
+                            <div class="transfer-times-box" style="justify-content: center; color: #f43f5e; font-size: 0.65rem;">
+                                No connecting scheduled trips found between these routes on this date.
                             </div>
                         `;
                     }
